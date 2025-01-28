@@ -1,0 +1,313 @@
+---
+title: "Make Circos Plots"
+author: "Seidu Adams<br><small>Fernando's Lab<br>Department of Animal Science<br>University of Nebraska -Lincoln</small>"
+date: "<small>`r Sys.Date()`</small>"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: true
+    toc_float: 
+      collapsed: true
+    code_folding: show
+    theme: cerulean
+    self_contained: true
+  pdf_document: 
+    latex_engine: xelatex
+  word_document: default  
+---
+
+
+Now everything is ready to start creating Chord diagram in R. First let’s install and load the circlize package as shown below:
+
+```{r}
+#install and load the package
+#install.packages("circlize")
+library(circlize)
+```
+
+
+Then we need to read the file into R by following the command below. Make sure the file is in CSV format and change the location in the command below. 
+
+```{r}
+#setwd("E:/ORAL_RUMEN_COMPARATIVE_ANALYSIS/FINAL_ORAL_RUMEN_2022YEAR")
+#read the csv file
+data <- read.csv("P400.468.family.csv", row.names = 1)
+```
+
+
+
+After that, we need to convert our table to a matrix
+
+```{r}
+#convert the table to a martix
+data <- as.matrix(data)
+```
+
+
+We can immediately plot a chord diagram by using the chordDiagram() function.
+
+```{r}
+#create a chord diagram
+chordDiagram(data)
+```
+
+
+R created the plot in the default setting. So we need to adjust according to our preferences.
+
+
+Since we have many columns and rows, the labels are on top of each other. To solve this, we need to plot the chord diagram without labels and axis and then adding them separately as shown in the commands below:
+
+```{r}
+jpeg("P400.468.jpg", height = 15, width = 15, units = 'in', res = 600)
+#create a chord diagram but without labeling 
+chordDiagram(data, annotationTrack = "grid", preAllocateTracks = 1)
+
+#add the labels and axis
+circos.trackPlotRegion(track.index = 2, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  
+#print labels 
+circos.text(mean(xlim), ylim[1] + 2.5, sector.name, 
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.6)
+  
+#print axis
+circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, 
+              sector.index = sector.name, track.index = 2)
+}, bg.border = NA)
+```
+
+
+
+
+
+Then we need to read the file into R by following the command below. Make sure the file is in CSV format and change the location in the command below. 
+
+```{r}
+#setwd("E:/ORAL_RUMEN_COMPARATIVE_ANALYSIS/FINAL_ORAL_RUMEN_2022YEAR")
+#read the csv file
+data <- read.csv("P295.365.family.csv", row.names = 1)
+```
+
+
+
+After that, we need to convert our table to a matrix
+
+```{r}
+#convert the table to a martix
+data <- as.matrix(data)
+```
+
+
+We can immediately plot a chord diagram by using the chordDiagram() function.
+
+```{r}
+#create a chord diagram
+chordDiagram(data)
+```
+
+
+R created the plot in the default setting. So we need to adjust according to our preferences.
+
+
+Since we have many columns and rows, the labels are on top of each other. To solve this, we need to plot the chord diagram without labels and axis and then adding them separately as shown in the commands below:
+
+```{r}
+jpeg("P295.365.jpg", height = 15, width = 15, units = 'in', res = 600)
+#create a chord diagram but without labeling 
+chordDiagram(data, annotationTrack = "grid", preAllocateTracks = 1)
+
+#add the labels and axis
+circos.trackPlotRegion(track.index = 2, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  
+#print labels 
+circos.text(mean(xlim), ylim[1] + 2.5, sector.name, 
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.6)
+  
+#print axis
+circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, 
+              sector.index = sector.name, track.index = 2)
+}, bg.border = NA)
+```
+
+
+
+
+
+Then we need to read the file into R by following the command below. Make sure the file is in CSV format and change the location in the command below. 
+
+```{r}
+#setwd("E:/ORAL_RUMEN_COMPARATIVE_ANALYSIS/FINAL_ORAL_RUMEN_2022YEAR")
+#read the csv file
+data <- read.csv("P170.240.family.csv", row.names = 1)
+```
+
+
+
+After that, we need to convert our table to a matrix
+
+```{r}
+#convert the table to a martix
+data <- as.matrix(data)
+```
+
+
+We can immediately plot a chord diagram by using the chordDiagram() function.
+
+```{r}
+#create a chord diagram
+chordDiagram(data)
+```
+
+
+R created the plot in the default setting. So we need to adjust according to our preferences.
+
+
+Since we have many columns and rows, the labels are on top of each other. To solve this, we need to plot the chord diagram without labels and axis and then adding them separately as shown in the commands below:
+
+```{r}
+jpeg("P170.240.jpg", height = 15, width = 15, units = 'in', res = 600)
+#create a chord diagram but without labeling 
+chordDiagram(data, annotationTrack = "grid", preAllocateTracks = 1)
+
+#add the labels and axis
+circos.trackPlotRegion(track.index = 2, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  
+#print labels 
+circos.text(mean(xlim), ylim[1] + 2.5, sector.name, 
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.6)
+  
+#print axis
+circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, 
+              sector.index = sector.name, track.index = 2)
+}, bg.border = NA)
+```
+
+
+
+
+Then we need to read the file into R by following the command below. Make sure the file is in CSV format and change the location in the command below. 
+
+```{r}
+#setwd("E:/ORAL_RUMEN_COMPARATIVE_ANALYSIS/FINAL_ORAL_RUMEN_2022YEAR")
+#read the csv file
+data <- read.csv("P50.120_Family.csv", row.names = 1)
+```
+
+
+
+After that, we need to convert our table to a matrix
+
+```{r}
+#convert the table to a martix
+data <- as.matrix(data)
+```
+
+
+We can immediately plot a chord diagram by using the chordDiagram() function.
+
+```{r}
+#create a chord diagram
+chordDiagram(data)
+```
+
+
+R created the plot in the default setting. So we need to adjust according to our preferences.
+
+
+Since we have many columns and rows, the labels are on top of each other. To solve this, we need to plot the chord diagram without labels and axis and then adding them separately as shown in the commands below:
+
+```{r}
+jpeg("P50.120.jpg", height = 15, width = 15, units = 'in', res = 600)
+#create a chord diagram but without labeling 
+chordDiagram(data, annotationTrack = "grid", preAllocateTracks = 1)
+
+#add the labels and axis
+circos.trackPlotRegion(track.index = 2, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  
+#print labels 
+circos.text(mean(xlim), ylim[1] + 2.5, sector.name, 
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.6)
+  
+#print axis
+circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, 
+              sector.index = sector.name, track.index = 2)
+}, bg.border = NA)
+```
+
+
+
+
+
+
+
+
+
+
+You do not need to change anything in the commands above. The argument that changes the labels’ angel is facing = “clockwise”. Now we get a beautiful plot with readable labels.
+
+
+
+You will find the saved images in your directory. One thing you might noticed is that the color is changing each time you create a chord diagram. This is because R assigns colors randomly.
+
+
+You may want to assign specific colors for some groups to make the figure more informative and also easy to read. To do that, we need to assign a color for each group as shown below. I put the whole previous codes in addition to the coloring command (colored in red).
+
+```{r}
+jpeg("Circos2_Combined.jpg", height = 10, width = 15, units = 'in', res = 600)
+#Color the links
+
+#read the csv file
+data <- read.csv("DAT.csv", row.names = 1)
+
+#convert the table to a martix
+data <- as.matrix(data)
+
+#assign color to each group of strains
+col = c(Litter_1="#330033", Sow_1="#330033" , Litter_2="#00AED7",
+             Sow_2="#00AED7", Litter_3="#FD9347", Sow_3="#FD9347", 
+             Litter_4="#D55E00" , Sow_4="#D55E00", Litter_5="#FF3300", 
+             Sow_5="#FF3300" , Litter_6="#3399CC" , Sow_6="#3399CC", 
+             Litter_7="#FFCC00" , Sow_7="#FFCC00" , Litter_8="#006600", Sow_8="#006600", 
+             Litter_9="#00CCFF", Sow_9="#00CCFF", Litter_10="#99CC00", Sow_10="#99CC00",  Actinobacteriota= "grey", Bacteroidota= "grey", Campilobacterota= "grey", Cyanobacteria= "grey",Desulfobacterota= "grey",
+             Elusimicrobiota= "grey", Euryarchaeota= "grey", Firmicutes= "grey",
+             Fusobacteriota= "grey", Patescibacteria= "grey", 
+             Planctomycetota= "grey", Proteobacteria= "grey", Spirochaetota= "grey", 
+             Synergistota= "grey", Thermoplasmatota= "grey", 
+             Verrucomicrobiota= "grey")
+
+
+#create a chord diagram but without labeling 
+chordDiagram(data, grid.col = col, annotationTrack = "grid", preAllocateTracks = 1)
+
+#add the labels and axis
+circos.trackPlotRegion(track.index = 2, panel.fun = function(x, y) {
+  xlim = get.cell.meta.data("xlim")
+  ylim = get.cell.meta.data("ylim")
+  sector.name = get.cell.meta.data("sector.index")
+  
+#print labels 
+circos.text(mean(xlim), ylim[1] + 2.5, sector.name, 
+              facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5), cex=0.6)
+  
+#print axis
+circos.axis(h = "top", labels.cex = 0.5, major.tick.percentage = 0.2, 
+              sector.index = sector.name, track.index = 2)
+}, bg.border = NA)
+
+```
+
+
+
+
