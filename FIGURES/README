@@ -1,1 +1,24 @@
+Figure 1. (a) illustrates the experimental design and time points for sample collection. (b) Table showing sample and ASV distribution across different sampling time points. (c) Phylum stacked barplot of oral and rumen microbiome composition at different age groups.  
+Figure 2. (a) illustrates the beta analysis using principal coordinate analysis (PCoA) between heifers and steers/bulls in all the datasets. (b) illustrates alpha diversity using the Shannon-Wieber diversity indices comparing heifers and steers. (c) Observed ASV and Shannon-Wiener alpha diversity index of the first three sampling time points. (d) Principal coordinate analysis (PCoA) of the microbiome community at different age groups. 
+Figure 3. (a) Bubble plot of phylum-level relative abundance distribution in the oral samples. (b) Observed and Shannon-Wiener alpha diversity indices in the oral samples at different age groups. (c) Principal coordinate analysis (PCoA) of the oral microbiome at different age and dietary groups. (d) Bubble plot of phylum-level relative abundance distribution in the rumen samples. (e) Observed and Shannon-Wiener alpha diversity indices in the rumen samples at different age groups. (f) Principal coordinate analysis (PCoA) of the rumen microbiome at different age and dietary groups. 
+Figure 4. (a) Venn diagram showing the persistent core oral microbiota at different ages (b) Venn diagram showing the persistent core rumen microbiota at different age groups. 
+Figure 5. Observed and Shannon-Wiener alpha diversity indices between oral and rumen microbiome at different age groups; 50-120 (a), 170-240 (b), 295-365 (c), 400-468 (d). Phylum level-based comparison between oral and rumen microbiome at different age groups; 50-120 (e), 170-240 (f), 295-365 (g), 400-468 (h). 
+Figure 6. Beta diversity analysis using weighted UniFrac and NMDS (Jaccard distances) between oral and rumen samples at different age groups; 50-120 (a), 170-240 (b), 295-365 (c), 400-468 (d).
+ Figure 7. Family level taxonomic abundance distribution between oral and rumen samples at different age groups; 50-120 (a), 170-240 (b), 295-365 (c), 400-468 (d). 
+Figure 8. Heatmap of the differential abundance analysis at ASV level. The top 80 most abundant differential abundance ASVs between the oral and rumen samples visualized at the genus level across different age groups; 50-120 (a), 170-240 (b), 295-365 (c), 400-468 (d). 
+Figure 9. Scatter plot of ASV level predictions; 50-120 time point oral microbiome for (a)birth weight, (b) weaning weight, (c) IMF, and (d) REA; 50-120 time point rumen microbiome for (a)birth weight, (b) weaning weight, (c) IMF, and (d) REA
+Table 1. Beta diversity analysis of Bray-Curtis, weighted UniFrac, and NMDS between oral and rumen samples at the different age groups. 
+Supplementary Figure S1. Heatmap of the differential abundance analysis at the ASV level between the first two sampling time points (50-120 & 170-240) of the oral samples. The top 80 most abundant differential abundance ASVs between 50-120 & 170-240 visualized at the genus level across oral samples.
+Supplementary Figure S2. Heatmap of the differential abundance analysis at the ASV level between the first two sampling time points (50-120 & 170-240) of the rumen samples. The top 80 most abundant differential abundance ASVs between 50-120 & 170-240 visualized at the genus level across rumen samples.
+Supplementary Table S1. Mean relative abundances of all 3434 high-quality ASVs classified at seven taxonomic levels.
+Supplementary Table S2. Mean relative abundances of phylum-level classification of the oral microbiome.
+Supplementary Table S3. Differential abundance ASV analysis of the oral samples at the first two age categories (50-120 & 170-240).
+Supplementary Table S4. Core oral microbiota at the different age groups (50-120, 170-240, 295-365, & 400-468). 
+Supplementary Table S5. Mean relative abundances of phylum-level classification of the rumen microbiome.
+Supplementary Table S6. Differential abundance ASV analysis of the rumen samples at the first two age categories (50-120 & 170-240).
+Supplementary Table S7. Core oral microbiota at different age groups (50-120, 170-240, 295-365, & 400-468). 
+Supplementary Table S8. Differential abundance ASV analysis between oral and rumen microbiome at 50-120.
+Supplementary Table S9. Differential abundance ASV analysis between oral and rumen microbiome at 170-240.
+Supplementary Table S10. Differential abundance ASV analysis between oral and rumen microbiome at 295-365.
+Supplementary Table S11. Differential abundance ASV analysis between oral and rumen microbiome at 400-468.
 
