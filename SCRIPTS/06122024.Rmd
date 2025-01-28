@@ -1,0 +1,3458 @@
+---
+title: "Seidu Adams"
+author: "Seidu.Adams"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r}
+library(vegan)
+library(tidyverse)
+library(phyloseq)
+library(microbiome)
+library(microbiomeutilities)
+library(ggpubr) 
+library(patchwork) 
+library(tibble)
+library(tidyr)
+library(readr)
+library(gghalves)
+library(reshape)
+library(rstatix)
+theme_set(theme_bw())
+library(RColorBrewer)
+library(ggplot2)
+```
+
+
+
+```{r}
+setwd("D:/ORAL_RUMEN_COMPARATIVE_ANALYSIS/FINAL_ORAL_RUMEN_2022YEAR")
+load("ps_CountAbunance_alpha.RData")
+load("ps_RelativeAbundance_alpha.RData")
+load("ps_filtered_count.RData")
+load("ps_filtered_RelAbun.RData")
+
+```
+
+
+```{r}
+ps_filtered_count
+write.csv(data.frame(sample_data(ps_filtered_count)), file = "MATADATA.csv")
+```
+
+
+##Venn Diagram#
+
+```{r}
+library(VennDiagram)
+
+otu_venn=read.csv("PersistentCoreORALASVs.csv", header=TRUE, fill=T, na.string="", stringsAsFactors=F)
+
+for (i in 1:4){
+  tem = na.omit(otu_venn[,i])
+  tem = data.frame(tem)
+  assign(paste("a", i, sep = ""),tem)
+}
+venn_list <- list(a1[,1], a2[,1],a3[,1],a4[,1])
+
+names(venn_list) <- colnames(otu_venn)
+venn.diagram(venn_list, filename = 'PersistentCoreORALASVs_venn1.png', fill = c( 'red','purple', 'yellow',"blue"))
+```
+
+
+
+##Venn Diagram#
+
+```{r}
+library(VennDiagram)
+
+otu_venn=read.csv("PersistentCoreRUMENASVs.csv", header=TRUE, fill=T, na.string="", stringsAsFactors=F)
+
+for (i in 1:4){
+  tem = na.omit(otu_venn[,i])
+  tem = data.frame(tem)
+  assign(paste("a", i, sep = ""),tem)
+}
+venn_list <- list(a1[,1], a2[,1],a3[,1],a4[,1])
+
+names(venn_list) <- colnames(otu_venn)
+venn.diagram(venn_list, filename = 'PersistentCoreRUMENASVs_venn1.png', fill = c( 'red','purple', 'yellow',"blue"))
+```
+
+
+```{r}
+jpeg("AGE.wunifrac.jpg", height = 4, width = 4, units = 'in', res = 650)
+sample_data(ps_filter_complete)$AgeAtSampl<- factor(sample_data(ps_filter_complete)$AgeAtSampl, levels = c("50-120","170-240","295-365","400-468"))
+dist = phyloseq::distance(ps_filter_complete, method = "wunifrac")
+ordination = ordinate(ps_filter_complete, method="PCoA", distance=dist)
+plot_ordination(ps_filter_complete, ordination, color="AgeAtSampl") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_filter_complete), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_filter_complete, method="wunifrac") ~  AgeAtSampl,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+```{r}
+jpeg("AGE_ALPHAT.jpg", height = 3, width = 6, units = 'in', res = 650)
+
+alphaobj <- get_alphaindex(ps_CountAbunance_alpha)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="AgeAtSampl", factorLevels= list(AgeAtSampl=c("50-120","170-240","295-365","400-468")), compare = TRUE,testmethod = "wilcox.test", indexNames =  c("Observe","Shannon" )) +
+           scale_fill_manual(values=c("#F2CE46", "cyan1", "royalblue4", "darksalmon"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+
+```
+
+
+```{r}
+library(phyloseq)
+ps_Oral<- subset_samples(ps_filtered_count, Subject != "Rumen")
+paotOral <- rowSums(otu_table(ps_Oral)) > 0
+ps_Oral<- prune_taxa(paotOral, ps_Oral)
+ps_Oral
+sum(colSums(otu_table(ps_Oral))) 
+#library(ampvis2)
+d <- amp_load(
+  otutable = otu_table(ps_Oral),
+  metadata = sample_data(ps_Oral),
+  taxonomy = phyloseq::tax_table(ps_Oral)
+)
+d
+write.csv(phyloseq::tax_table(psFinalpsOral), file = "TaxonomyOralOnly882024.csv")
+```
+
+
+```{r}
+OTU <- otu_table(ps_Oral)
+Meta <- sample_data(ps_Oral)
+TAX <- phyloseq::tax_table(ps_Oral)
+tax.clean <- as.data.frame(TAX)
+tax.clean[is.na(tax.clean)] <- ""
+tax.clean[tax.clean=="__"] <- ""
+
+for (i in 1:nrow(tax.clean)){
+  if (tax.clean[i,7] != ""){
+    tax.clean$Species[i] <- paste(tax.clean$Genus[i], tax.clean$Species[i], sep = " ")
+  } else if (tax.clean[i,2] == ""){
+    kingdom <- paste("Unclassified", tax.clean[i,1], sep = " ")
+    tax.clean[i, 2:7] <- kingdom
+  } else if (tax.clean[i,3] == ""){
+    phylum <- paste("Unclassified", tax.clean[i,2], sep = " ")
+    tax.clean[i, 3:7] <- phylum
+  } else if (tax.clean[i,4] == ""){
+    class <- paste("Unclassified", tax.clean[i,3], sep = " ")
+    tax.clean[i, 4:7] <- class
+  } else if (tax.clean[i,5] == ""){
+    order <- paste("Unclassified", tax.clean[i,4], sep = " ")
+    tax.clean[i, 5:7] <- order
+  } else if (tax.clean[i,6] == ""){
+    family <- paste("Unclassified", tax.clean[i,5], sep = " ")
+    tax.clean[i, 6:7] <- family
+  } else if (tax.clean[i,7] == ""){
+    tax.clean$Species[i] <- paste("Unclassified ",tax.clean$Genus[i], sep = " ")
+  }
+}
+
+
+OTUS = otu_table(as.matrix(OTU), taxa_are_rows = TRUE)
+TAXA = phyloseq::tax_table(as.matrix(tax.clean))
+SAMPLE <- sample_data(data.frame(Meta))
+# Reorder the samples for the plot
+SAMPLE$AgeAtSampl <- factor(SAMPLE$AgeAtSampl, levels = c("50-120", "170-240", "295-365","400-468"))
+ps_partial = phyloseq(OTUS, TAXA)
+##write.csv(as.data.frame(SAMPLE), file = "SAMP.csv")
+#sample <-read.table("Metadata.txt", header=T, row.names=1,
+ #                             check.names=F, sep="\t")
+sampledata = sample_data(data.frame(
+SAMPLE, row.names=sample_names(ps_partial), stringsAsFactors=FALSE))
+
+TREE = phy_tree(ps_Oral)
+# merge the data
+psFinalpsOral<- phyloseq(OTUS, TAXA, sampledata,TREE)
+psFinalpsOral
+
+#write.table(otu_table(ps_Oral), "All_otu_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.table(phyloseq::tax_table(psFinalpsOral), "All_taxa_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.csv(data.frame(SAMPLE), file = "All_sample_data_psOral.csv", row.names = TRUE)
+```
+
+
+
+
+
+*Oral Phylum level rel abund*
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(psFinalpsOral, function(x) x / sum(x))
+ps_phylum <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Bdellovibrionota","Campilobacterota","Chloroflexi","Crenarchaeota","Cyanobacteria","Deinococcota","Desulfobacterota","Elusimicrobiota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Halobacterota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(ps_phylumP)
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_AgeAtSampl.ORAL882024.csv")
+#View(sample_data(ps))
+```
+
+
+*Oral Family level rel abund*
+
+#family level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(psFinalpsOral, function(x) x / sum(x))
+ps_family<- tax_glom(relabun, taxrank = "Family", NArm = FALSE)
+# Calculate the relative abundance for specific family
+ps_familyP <- subset_taxa(ps_family, Family %in% c("[Eubacterium] coprostanoligenes group","Acholeplasmataceae","Acidaminococcaceae","Aerococcaceae","Akkermansiaceae","Alcaligenaceae","Alicyclobacillaceae","Anaerolineaceae","Anaerovoracaceae","Ardenticatenaceae","Atopobiaceae","Bacillaceae","Bacteroidaceae","Bacteroidales BS11 gut group","Bacteroidales RF16 group","Bacteroidales UCG-001","Bacteroidetes BD2-2","Beijerinckiaceae","Bifidobacteriaceae","Blastocatellaceae","Bogoriellaceae","Burkholderiaceae","Butyricicoccaceae","Caldilineaceae","Campylobacteraceae",
+"Cardiobacteriaceae","Carnobacteriaceae","Caulobacteraceae","Cellulomonadaceae","Cellvibrionaceae","Chitinophagaceae","Christensenellaceae","Clostridiaceae","Comamonadaceae","Coriobacteriaceae","Corynebacteriaceae","Cyclobacteriaceae","Defluviicoccaceae","Defluviitaleaceae","Deinococcaceae","Desulfovibrionaceae","Dietziaceae","Dysgonomonadaceae","Eggerthellaceae","Elusimicrobiaceae","Endomicrobiaceae","Enterobacteriaceae","Enterococcaceae","Erwiniaceae","Erysipelatoclostridiaceae","Erysipelotrichaceae","F082","Fibrobacteraceae","Flavobacteriaceae","Fusobacteriaceae","Gemellaceae","Gemmatimonadaceae","Geodermatophilaceae","Helcococcus","Hymenobacteraceae","Iamiaceae","Ilumatobacteraceae","Intrasporangiaceae","JG30-KF-CM45","Lachnospiraceae","Lactobacillaceae","Leptotrichiaceae","Listeriaceae","Longimicrobiaceae","Marinifilaceae","Marinilabiliaceae","Methanobacteriaceae","Methanocorpusculaceae","Methanomethylophilaceae","Methanomicrobiaceae","Methanosarcinaceae","Microbacteriaceae","Micrococcaceae","Micromonosporaceae","Monoglobaceae","Moraxellaceae","Muribaculaceae","Mycobacteriaceae","Mycoplasmataceae","Myxococcaceae","Neisseriaceae",
+"Nitrosomonadaceae","Nitrososphaeraceae","Nocardiaceae","Nocardioidaceae","Oscillospiraceae","Oxalobacteraceae","p-251-o5","p-2534-18B5 gut group","Paenibacillaceae","Paludibacteraceae","Pasteurellaceae","Pedosphaeraceae","PeH15","Peptococcaceae","Peptostreptococcaceae","Pirellulaceae","Planococcaceae",
+"Polyangiaceae","Porphyromonadaceae","Prevotellaceae","Propionibacteriaceae","Pseudomonadaceae","Pseudonocardiaceae","Reyranellaceae","Rhizobiaceae",
+"Rhizobiales Incertae Sedis","Rhodobacteraceae","Rikenellaceae","Rubritaleaceae","Rubrobacteriaceae","Ruminiclostridium","Ruminococcaceae","Saccharimonadaceae","Saccharofermentans","Sanguibacteraceae","Selenomonadaceae","Solirubrobacteraceae","Sphingobacteriaceae","Sphingomonadaceae","Spirochaetaceae","Spirosomaceae","Staphylococcaceae","Steroidobacteraceae","Streptococcaceae","Succinivibrionaceae","Sumerlaeaceae","Sutterellaceae","Synergistaceae","Tannerellaceae","Taonella","UCG-010","UCG-012","Unclassified 0319-6G20","Unclassified Absconditabacteriales (SR1)","Unclassified Acidimicrobiia","Unclassified Ardenticatenales","Unclassified Bacillales",
+"Unclassified Bacteroidales","Unclassified Bacteroidia","Unclassified Bradymonadales","Unclassified Clostridia","Unclassified Clostridia UCG-014","Unclassified Clostridia vadinBB60 group","Unclassified Desulfuromonadaceae","Unclassified EPR3968-O8a-Bc78","Unclassified Gammaproteobacteria","Unclassified Gastranaerophilales","Unclassified Gitt-GS-136","Unclassified Gracilibacteria","Unclassified Hungateiclostridiaceae","Unclassified Izemoplasmatales","Unclassified JGI 0000069-P22","Unclassified Lachnospirales","Unclassified LD1-PB3","Unclassified Micrococcales","Unclassified Microtrichales","Unclassified MVP-15","Unclassified Oscillospirales","Unclassified Pla4 lineage","Unclassified Planctomycetales","Unclassified RF39","Unclassified Rhodospirillales","Unclassified S0134 terrestrial group","Unclassified Saccharimonadales","Unclassified Vicinamibacterales","Unclassified WCHB1-41","vadinBE97","Veillonellaceae","Vicinamibacteraceae","Victivallaceae","WD2101 soil group","Weeksellaceae","Xanthobacteraceae","Xanthomonadaceae"
+))
+
+# Calculate the total taxonomic abundance
+family.df <- psmelt(ps_familyP)
+
+MySummary <- family.df %>% group_by(Subject, AgeAtSampl, Family) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundancefamily_AgeAtSampl.ORAL882024.csv")
+#View(sample_data(ps))
+```
+
+```{r}
+jpeg("ORAL_ALPHAT.jpg", height = 3, width = 5, units = 'in', res = 650)
+
+ps_OralAlpha<- subset_samples(ps_CountAbunance_alpha, Subject != "Rumen")
+paotOralAlpha <- rowSums(otu_table(ps_OralAlpha)) > 0
+ps_OralAlpha<- prune_taxa(paotOralAlpha, ps_OralAlpha)
+ps_OralAlpha
+
+alphaobj <- get_alphaindex(ps_OralAlpha)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="AgeAtSampl", factorLevels= list(AgeAtSampl=c("50-120","170-240","295-365","400-468")), compare = TRUE,testmethod = "wilcox.test", indexNames =  c("Observe","Shannon")) +
+           scale_fill_manual(values=c("#F2CE46", "cyan1", "royalblue4", "darksalmon"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+jpeg("ORAL.NMDS.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(psFinalpsOral, method="jaccard", binary = TRUE)
+ordination = ordinate(psFinalpsOral, method="NMDS", distance=dist)
+plot_ordination(psFinalpsOral, ordination, color= "AgeAtSampl", shape = "Diet") + 
+  theme_classic() + 
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(psFinalpsOral))
+anosim(dist, metadata$AgeAtSampl)
+```
+
+
+```{r}
+jpeg("ORAL.wunifrac.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(psFinalpsOral, method = "wunifrac")
+ordination = ordinate(psFinalpsOral, method="PCoA", distance=dist)
+plot_ordination(psFinalpsOral, ordination, color="AgeAtSampl", shape = "Diet") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(psFinalpsOral), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(psFinalpsOral, method="wunifrac") ~  AgeAtSampl+Diet,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+
+```{r}
+jpeg("ORAL_scatterplot.jpg", height = 6, width = 7, units = 'in', res = 650)
+# Summarize data for dot plot
+# Aggregate data at Phylum level
+ps_phylum <- tax_glom(psFinalpsOral, "Phylum")
+
+# Calculate relative abundance
+ps_phylum_relabund <- transform_sample_counts(ps_phylum, function(x) x / sum(x))
+
+# Melt the data for ggplot2
+df_phylum <- psmelt(ps_phylum_relabund)
+df_dot <- df_phylum %>%
+  group_by(Phylum, AgeAtSampl) %>%
+  summarise(RelAbund = mean(Abundance)) %>%
+  ungroup()
+df_dot$AgeAtSampl <- factor(df_dot$AgeAtSampl, levels = c("50-120","170-240","295-365","400-468"))
+# Create the dot plot
+pppOral <- ggplot(df_dot, aes(x = AgeAtSampl, y = Phylum, size = RelAbund, color = Phylum)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  scale_size_continuous(range = c(0.5, 10)) +
+  labs(x = "AgeAtSampl", y = "Phylum", size = "Relative Abundance")
+pppOral
+
+```
+
+
+
+
+
+*50-120 vs 170-240 oral differential*
+
+```{r}
+jpeg("DifferentialAbundance.pOral50120vs170240.png", height = 25, width = 40, units = 'in', res = 120)
+psFinalpsOral<- subset_samples(psFinalpsOral, CowID != "2082")
+psoral50120vs170240<- subset_samples(psFinalpsOral, AgeAtSampl != "295-365")
+psoral50120vs170240<- subset_samples(psoral50120vs170240, AgeAtSampl != "400-468")
+paotOral50120vs170240 <- rowSums(otu_table(psoral50120vs170240)) > 0
+psoral50120vs170240<- prune_taxa(paotOral50120vs170240, psoral50120vs170240)
+psoral50120vs170240
+
+sample_data(psoral50120vs170240)$AgeAtSampl <- as.factor(sample_data(psoral50120vs170240)$AgeAtSampl) # factorize for DESeq2
+
+ps.taxa <- tax_glom(psoral50120vs170240, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between gut and tongue
+ps.taxa.sub <- subset_samples(ps.taxa, AgeAtSampl %in% c("50-120", "170-240"))
+#sample_data(ps.taxa.sub)$Sex <- as.factor(sample_data(ps.taxa.sub)$Sex)
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ AgeAtSampl)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentAbundancepsoral50120vs170240.csv")
+taxa_sig = rownames(sigtab[1:70, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(psoral50120vs170240, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+#ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+#write.csv(, file = "DifferentialASVs_ORALSAMPLES_50120vs170240.csv")
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="Differential_ASVs_psoral50120vs170240.Taxa.csv" )
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="Differential_ASVs_psoral50120vs170240.ASV.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="Differential_ASVs_psoral50120vs170240.Sample.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    AgeAtSampl = as.factor(metadata_sub$AgeAtSampl), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$AgeAtSampl <- factor(annotation_col$AgeAtSampl, levels = c("50-120", "170-240"))
+#annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    AgeAtSampl = c(`50-120` = "#F2CE46", `170-240` = "cyan1"),
+    `Sex` = c(Heifers = "red", Steers = "blue" ),
+    Phylum = phylum_col
+)
+
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$AgeAtSampl)
+                        
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+#write.csv(otu_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_OTU.csv")
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_TAXA.csv")
+summary(res)
+```
+
+Differential Abundant ASVs in 50-120 vs 170-240
+
+```{r}
+DA.taxa.standard <- subset(otu_table(psoral50120vs170240), rownames(otu_table(psoral50120vs170240)) %in% c("ASV_111","ASV_53","ASV_34","ASV_152","ASV_90","ASV_416","ASV_15","ASV_22","ASV_1","ASV_47","ASV_17","ASV_13","ASV_312","ASV_279","ASV_723","ASV_242","ASV_375","ASV_564","ASV_590","ASV_650","ASV_5","ASV_82","ASV_335","ASV_231","ASV_545","ASV_25","ASV_65","ASV_36","ASV_345","ASV_768","ASV_212","ASV_1320","ASV_592","ASV_1629","ASV_98","ASV_26","ASV_785","ASV_432","ASV_329","ASV_21","ASV_59","ASV_437","ASV_38","ASV_10","ASV_27","ASV_860","ASV_1251","ASV_1041","ASV_9","ASV_163","ASV_50","ASV_3","ASV_790","ASV_316","ASV_471","ASV_1503","ASV_823","ASV_2135","ASV_904","ASV_2361","ASV_915","ASV_96","ASV_787","ASV_16","ASV_1391","ASV_567","ASV_911","ASV_538","ASV_2045","ASV_12","ASV_20","ASV_24","ASV_917","ASV_740","ASV_234","ASV_19","ASV_228","ASV_85","ASV_2066","ASV_1194","ASV_40","ASV_1890","ASV_2328","ASV_32","ASV_1201","ASV_3186","ASV_1955","ASV_56","ASV_2018","ASV_1305","ASV_783","ASV_379","ASV_962","ASV_1460","ASV_1044","ASV_417","ASV_2952","ASV_3788","ASV_323","ASV_60","ASV_1108","ASV_190","ASV_2270","ASV_528","ASV_585","ASV_1374","ASV_78","ASV_1239","ASV_41","ASV_676","ASV_1549","ASV_900","ASV_733","ASV_326","ASV_878","ASV_119","ASV_759","ASV_586","ASV_18","ASV_148","ASV_129","ASV_72","ASV_392","ASV_2040","ASV_1032","ASV_2340","ASV_1597","ASV_3313","ASV_7","ASV_102","ASV_3361","ASV_369","ASV_113","ASV_120","ASV_57","ASV_151","ASV_353","ASV_1153","ASV_395","ASV_117","ASV_2184","ASV_472","ASV_2941","ASV_3202","ASV_393","ASV_100","ASV_3544","ASV_122","ASV_2917","ASV_361","ASV_949","ASV_31","ASV_1566","ASV_527","ASV_4","ASV_2630","ASV_244","ASV_3648","ASV_168","ASV_413","ASV_325","ASV_1096","ASV_428","ASV_364","ASV_522","ASV_3390","ASV_1754","ASV_533","ASV_1956","ASV_767","ASV_720","ASV_357","ASV_467","ASV_579","ASV_865","ASV_827","ASV_128","ASV_573","ASV_1002","ASV_11","ASV_1300","ASV_1334","ASV_1101","ASV_67","ASV_2405","ASV_147","ASV_150","ASV_670","ASV_180","ASV_211","ASV_63","ASV_200","ASV_439","ASV_125","ASV_1525","ASV_144","ASV_742","ASV_430","ASV_58","ASV_210","ASV_1012","ASV_367","ASV_239","ASV_380","ASV_1409","ASV_2509","ASV_86","ASV_37","ASV_260","ASV_1000","ASV_574","ASV_1514","ASV_2239","ASV_62","ASV_309","ASV_304"
+))
+                           
+DA.Oral.50120vs170240ps <- merge_phyloseq(DA.taxa.standard, phyloseq::tax_table(psoral50120vs170240), sample_data(psoral50120vs170240))
+
+DA.Oral.50120vs170240ps.re <-  transform_sample_counts(DA.Oral.50120vs170240ps, function(x) x / sum(x) )
+write.table(otu_table(DA.Oral.50120vs170240ps.re), "DA.Oral.50120vs170240ps_otu_table.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+write.table(phyloseq::tax_table(DA.Oral.50120vs170240ps.re), "DA.Oral.50120vs170240ps_taxa_table.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+write.table(data.frame(sample_data(DA.Oral.50120vs170240ps.re)), "DA.Oral.50120vs170240ps_sample_data.txt", sep = "\t", col.names = T, row.names = F, quote = F)
+```
+
+
+
+
+```{r}
+library(phyloseq)
+ps_Rumen<- subset_samples(ps_filtered_count, Subject != "Oral")
+paotRumen <- rowSums(otu_table(ps_Rumen)) > 0
+ps_Rumen<- prune_taxa(paotRumen, ps_Rumen)
+ps_Rumen
+sum(colSums(otu_table(ps_Rumen))) 
+#library(ampvis2)
+d <- amp_load(
+  otutable = otu_table(ps_Rumen),
+  metadata = sample_data(ps_Rumen),
+  taxonomy = phyloseq::tax_table(ps_Rumen)
+)
+d
+write.csv(phyloseq::tax_table(psFinalpsOral), file = "TaxonomyOralOnly882024.csv")
+```
+
+
+```{r}
+OTU <- otu_table(ps_Rumen)
+Meta <- sample_data(ps_Rumen)
+TAX <- phyloseq::tax_table(ps_Rumen)
+tax.clean <- as.data.frame(TAX)
+tax.clean[is.na(tax.clean)] <- ""
+tax.clean[tax.clean=="__"] <- ""
+
+for (i in 1:nrow(tax.clean)){
+  if (tax.clean[i,7] != ""){
+    tax.clean$Species[i] <- paste(tax.clean$Genus[i], tax.clean$Species[i], sep = " ")
+  } else if (tax.clean[i,2] == ""){
+    kingdom <- paste("Unclassified", tax.clean[i,1], sep = " ")
+    tax.clean[i, 2:7] <- kingdom
+  } else if (tax.clean[i,3] == ""){
+    phylum <- paste("Unclassified", tax.clean[i,2], sep = " ")
+    tax.clean[i, 3:7] <- phylum
+  } else if (tax.clean[i,4] == ""){
+    class <- paste("Unclassified", tax.clean[i,3], sep = " ")
+    tax.clean[i, 4:7] <- class
+  } else if (tax.clean[i,5] == ""){
+    order <- paste("Unclassified", tax.clean[i,4], sep = " ")
+    tax.clean[i, 5:7] <- order
+  } else if (tax.clean[i,6] == ""){
+    family <- paste("Unclassified", tax.clean[i,5], sep = " ")
+    tax.clean[i, 6:7] <- family
+  } else if (tax.clean[i,7] == ""){
+    tax.clean$Species[i] <- paste("Unclassified ",tax.clean$Genus[i], sep = " ")
+  }
+}
+
+
+OTUS = otu_table(as.matrix(OTU), taxa_are_rows = TRUE)
+TAXA = phyloseq::tax_table(as.matrix(tax.clean))
+SAMPLE <- sample_data(data.frame(Meta))
+# Reorder the samples for the plot
+SAMPLE$AgeAtSampl <- factor(SAMPLE$AgeAtSampl, levels = c("50-120", "170-240", "295-365","400-468"))
+ps_partial = phyloseq(OTUS, TAXA)
+##write.csv(as.data.frame(SAMPLE), file = "SAMP.csv")
+#sample <-read.table("Metadata.txt", header=T, row.names=1,
+ #                             check.names=F, sep="\t")
+sampledata = sample_data(data.frame(
+SAMPLE, row.names=sample_names(ps_partial), stringsAsFactors=FALSE))
+
+TREE = phy_tree(ps_Rumen)
+# merge the data
+psFinalpsRumen<- phyloseq(OTUS, TAXA, sampledata,TREE)
+psFinalpsRumen
+
+#write.table(otu_table(ps_Oral), "All_otu_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.table(phyloseq::tax_table(psFinalpsOral), "All_taxa_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.csv(data.frame(SAMPLE), file = "All_sample_data_psOral.csv", row.names = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*50-120 vs 170-240 Rumen differential*
+
+```{r}
+jpeg("DifferentialAbundance.pRumen.50120vs170240.png", height = 25, width = 40, units = 'in', res = 120)
+psFinalpsRumen<- subset_samples(psFinalpsRumen, CowID != "2082")
+psrumen50120vs170240<- subset_samples(psFinalpsRumen, AgeAtSampl != "295-365")
+psrumen50120vs170240<- subset_samples(psrumen50120vs170240, AgeAtSampl != "400-468")
+paotrumen50120vs170240 <- rowSums(otu_table(psrumen50120vs170240)) > 0
+psrumen50120vs170240<- prune_taxa(paotrumen50120vs170240, psrumen50120vs170240)
+psrumen50120vs170240
+
+sample_data(psrumen50120vs170240)$AgeAtSampl <- as.factor(sample_data(psrumen50120vs170240)$AgeAtSampl) # factorize for DESeq2
+
+ps.taxa <- tax_glom(psrumen50120vs170240, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between gut and tongue
+ps.taxa.sub <- subset_samples(ps.taxa, AgeAtSampl %in% c("50-120", "170-240"))
+sample_data(ps.taxa.sub)$Sex <- as.factor(sample_data(ps.taxa.sub)$Sex)
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ AgeAtSampl)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentiaAbundance_ASVs_pRumen50120vs170240.csv")
+taxa_sig = rownames(sigtab[1:70, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(psrumen50120vs170240, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+#ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="DifferentiaAbundance_ASVs_pRumen50120vs170240.Taxa.csv" )
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="DifferentiaAbundance_ASVs_pRumen50120vs170240.ASV.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="DifferentiaAbundance_ASVs_pRumen50120vs170240.meta.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    AgeAtSampl = as.factor(metadata_sub$AgeAtSampl), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$AgeAtSampl <- factor(annotation_col$AgeAtSampl, levels = c("50-120", "170-240"))
+annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    AgeAtSampl = c(`50-120` = "#F2CE46", `170-240` = "cyan1"),
+    `Sex` = c(Heifers = "red", Steers = "blue" ),
+    Phylum = phylum_col
+)
+
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$AgeAtSampl)
+                        
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+#write.csv(otu_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_OTU.csv")
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_TAXA.csv")
+summary(res)
+```
+
+Differential Abundant ASVs in Rumen 50-120 vs 170-240
+
+```{r}
+DA.ru.taxa.standard <- subset(otu_table(psrumen50120vs170240), rownames(otu_table(psrumen50120vs170240)) %in% c("ASV_1","ASV_26","ASV_551",'ASV_40',"ASV_749","ASV_24","ASV_50","ASV_22","ASV_10","ASV_660","ASV_685","ASV_103","ASV_257","ASV_264","ASV_643","ASV_233","ASV_18","ASV_135","ASV_155","ASV_45","ASV_60","ASV_225","ASV_688","ASV_245","ASV_472","ASV_266","ASV_354","ASV_88",
+"ASV_413","ASV_217","ASV_521","ASV_16","ASV_905","ASV_41","ASV_389","ASV_2002","ASV_19","ASV_287","ASV_235","ASV_208","ASV_72","ASV_85","ASV_192","ASV_151","ASV_750","ASV_623","ASV_228","ASV_427","ASV_248","ASV_67","ASV_175","ASV_1645","ASV_110","ASV_293","ASV_1067","ASV_606","ASV_338","ASV_1250","ASV_430","ASV_2258","ASV_37","ASV_610","ASV_503","ASV_28","ASV_1139","ASV_27","ASV_577","ASV_439","ASV_20","ASV_17","ASV_363","ASV_474","ASV_211","ASV_455","ASV_325","ASV_395","ASV_1532","ASV_506","ASV_596","ASV_9","ASV_309","ASV_111","ASV_1126","ASV_201","ASV_74","ASV_753","ASV_15","ASV_13","ASV_604","ASV_807","ASV_1970","ASV_637","ASV_1651","ASV_148","ASV_940","ASV_1908","ASV_1722","ASV_1316","ASV_216","ASV_120","ASV_2433","ASV_129","ASV_63","ASV_117","ASV_833","ASV_1194","ASV_1090","ASV_2393","ASV_775","ASV_514","ASV_1534","ASV_106","ASV_2561","ASV_1193","ASV_56","ASV_53","ASV_350","ASV_5","ASV_379","ASV_1196","ASV_2609","ASV_881","ASV_296","ASV_557","ASV_2569","ASV_1568","ASV_2924","ASV_2387","ASV_780","ASV_1597","ASV_298","ASV_125","ASV_188","ASV_1264","ASV_1038","ASV_1124","ASV_1280","ASV_1439","ASV_47","ASV_1108","ASV_2941","ASV_32","ASV_281","ASV_335","ASV_771","ASV_589","ASV_2801","ASV_8","ASV_316","ASV_403","ASV_799","ASV_870","ASV_2285","ASV_955","ASV_1317","ASV_100","ASV_875","ASV_1460","ASV_759","ASV_96","ASV_720","ASV_286","ASV_748","ASV_1155","ASV_1242","ASV_362","ASV_573","ASV_1922","ASV_83","ASV_1720","ASV_582","ASV_1914","ASV_231","ASV_258","ASV_136","ASV_891","ASV_661","ASV_119","ASV_251","ASV_510","ASV_1816","ASV_11","ASV_1239","ASV_7","ASV_443","ASV_2509","ASV_1528","ASV_1252","ASV_1099","ASV_3927","ASV_1150","ASV_2495","ASV_1549","ASV_471",'ASV_174',"ASV_3771","ASV_78","ASV_4871","ASV_2768","ASV_92","ASV_2800","ASV_3162","ASV_202","ASV_289","ASV_371","ASV_2156","ASV_128","ASV_440","ASV_278","ASV_59","ASV_773","ASV_908","ASV_575","ASV_361","ASV_3092","ASV_895","ASV_1161"
+
+))
+                           
+DA.rumen.50120vs170240ps <- merge_phyloseq(DA.ru.taxa.standard, phyloseq::tax_table(psrumen50120vs170240), sample_data(psrumen50120vs170240))
+
+DA.rumen.50120vs170240ps.re <-  transform_sample_counts(DA.rumen.50120vs170240ps, function(x) x / sum(x) )
+write.table(otu_table(DA.rumen.50120vs170240ps.re), "DA.rumen.50120vs170240ps_otu_table.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+write.table(phyloseq::tax_table(DA.rumen.50120vs170240ps.re), "DA.rumen.50120vs170240ps_taxa_table.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+write.table(data.frame(sample_data(DA.rumen.50120vs170240ps.re)), "DA.rumen.50120vs170240ps_sample_data.txt", sep = "\t", col.names = T, row.names = F, quote = F)
+```
+
+
+```{r}
+#jpeg("HeatMap_RebAbundance_Family_06192023.jpg", height = 7, width = 12, units = 'in', res = 600)
+ColSampCat = c("#7a255d", "#9fd0cb", "#7566ff","coral", "steelblue2", "slategray2")
+
+devtools::source_gist("8d0ca4206a66be7ff6d76fc4ab8e66c6")
+library(ampvis2)
+amp_raw_bact <-  amp_load(
+  otutable = otu_table(DA.Oral.50120vs170240ps),
+  metadata = data.frame(sample_data(DA.Oral.50120vs170240ps)),
+  taxonomy = phyloseq::tax_table(DA.Oral.50120vs170240ps)
+)
+amp_raw_bact$metadata$AgeAtSampl
+
+
+
+# Relative abundance
+heatmap_rel <- amp_heatmap(amp_raw_bact,
+            facet_by = "AgeAtSampl",
+           
+            tax_aggregate = "Species",
+            tax_show = 128,
+            normalise = TRUE,
+            plot_values = FALSE,
+            plot_values_size = 4,
+            round = 0,  plot_colorscale = "log10", measure = "mean",
+  min_abundance = 0.1,
+  max_abundance = 5)  +
+  theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1),
+        axis.text.y = element_text(size=10),
+        legend.position="right")
+heatmap_rel
+
+
+heatmap_count <- amp_heatmap(amp_raw_bact,
+            facet_by = "AgeAtSampl",
+            
+            tax_aggregate = "Family",
+            tax_show = 40,
+            normalise = FALSE,
+            plot_values = FALSE,
+            plot_values_size = 3,
+            round = 0, color_vector = c("white", "#e5ba52"), plot_colorscale = "log10") + theme(axis.text.x = element_text(angle = 45, size=10, vjust = 1), axis.text.y = element_text(size=10), legend.position="right")
+heatmap_count
+```
+
+
+
+
+```{r}
+OralDay50120ASVs  <- subset_samples(psFinalpsOral, AgeAtSampl != "170-240")
+OralDay50120ASVs  <- subset_samples(OralDay50120ASVs, AgeAtSampl != "295-365")
+OralDay50120ASVs  <- subset_samples(OralDay50120ASVs, AgeAtSampl != "400-468")
+pDay50120ASVs  <- rowSums(otu_table(OralDay50120ASVs)) > 0
+POralDay50120ASVs <- prune_taxa(pDay50120ASVs, OralDay50120ASVs)
+POralDay50120ASVs
+sum(rowSums(otu_table(POralDay50120ASVs)))
+#write.csv(phyloseq::tax_table(POralDay50120ASVs), file = "POralDay50120ASVs.csv")
+```
+
+
+core in oral day50120
+```{r}
+core.taxa.OralDay50120ASVs<- core_members(POralDay50120ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.OralDay50120ASVs <- core(POralDay50120ASVs, detection = 0.001, prevalence = .5)
+pseq.core.OralDay50120ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.OralDay50120ASVs ))/sum(taxa_sums(POralDay50120ASVs)) * 100
+sum(taxa_sums(pseq.core.OralDay50120ASVs))
+sum(taxa_sums(POralDay50120ASVs))
+write.csv(phyloseq::tax_table(pseq.core.OralDay50120ASVs), file = "pseq.core.OralDay50120ASVs.csv")
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay50120ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Actinobacteriota","Bacteroidota","Firmicutes","Gemmatimonadota","Proteobacteria",
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay50120ASVsSpecies.csv")
+#View(sample_data(ps))
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay50120ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga","Mycoplasma bovoculi","Rhodococcus erythropolis","Sphingomonas leidyi","Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus","Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae"
+
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay50120ASVsSpecies.csv")
+#View(sample_data(ps))
+```
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay50120ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Bdellovibrionota","Campilobacterota","Chloroflexi","Crenarchaeota",
+"Cyanobacteria","Deinococcota","Desulfobacterota","Elusimicrobiota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay50120ASVs.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_genus , function(x) x / sum(x))
+ps_genus <- tax_glom(pseq.core.OralDay50120ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Species) %>%
+  summarize(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay50120Species.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+POralDay170240ASVs
+
+```{r}
+OralDay170240ASVs  <- subset_samples(psFinalpsOral, AgeAtSampl != "50-120")
+OralDay170240ASVs   <- subset_samples(OralDay170240ASVs , AgeAtSampl != "295-365")
+OralDay170240ASVs   <- subset_samples(OralDay170240ASVs , AgeAtSampl != "400-468")
+pDay170240ASVs  <- rowSums(otu_table(OralDay170240ASVs )) > 0
+POralDay170240ASVs <- prune_taxa(pDay170240ASVs, OralDay170240ASVs )
+POralDay170240ASVs
+sum(rowSums(otu_table(POralDay170240ASVs)))
+#write.csv(phyloseq::tax_table(POralDay170240ASVs), file = "POralDay170240ASVs.csv")
+```
+
+core in oral day170240
+```{r}
+core.taxa.OralDay170240ASVs<- core_members(POralDay170240ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.OralDay170240ASVs <- core(POralDay170240ASVs, detection = 0.001, prevalence = .5)
+pseq.core.OralDay170240ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.OralDay170240ASVs))/sum(taxa_sums(POralDay170240ASVs)) * 100
+sum(taxa_sums(pseq.core.OralDay170240ASVs))
+sum(taxa_sums(POralDay170240ASVs))
+write.csv(phyloseq::tax_table(pseq.core.OralDay170240ASVs), file = "pseq.core.OralDay170240ASVs.csv")
+```
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay170240ASVs, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Actinobacteriota","Bacteroidota","Firmicutes","Gemmatimonadota","Proteobacteria",
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay170240ASVs.csv")
+#View(sample_data(ps))
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay170240ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga","Mycoplasma bovoculi","Rhodococcus erythropolis","Sphingomonas leidyi","Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus","Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae"
+
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay170240ASVsSpecies.csv")
+#View(sample_data(ps))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay170240ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Bdellovibrionota","Campilobacterota","Chloroflexi","Crenarchaeota","Cyanobacteria","Deinococcota","Desulfobacterota","Elusimicrobiota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Halobacterota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.OralDay170240ASVs.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+#specieslevel relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay170240ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Species %in% c("Alysiella crassa","Methylobacterium-Methylorubrum extorquens","Moraxella oblonga", "Moraxella cuniculi", "Pseudomonas antarctica","Stenotrophomonas maltophilia", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Alkanindiges","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Bergeyella","Unclassified  Christensenellaceae R-7 group","Unclassified  Conchiformibius","Unclassified  Mannheimia","Unclassified  Streptococcus","Unclassified Pasteurellaceae","Unclassified  Porphyromonas","Unclassified  Rikenellaceae RC9 gut group","Unclassified  Methanobrevibacter" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay170240Species.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+POralDay295365ASVs
+
+```{r}
+OralDay295365ASVs  <- subset_samples(psFinalpsOral, AgeAtSampl != "50-120")
+OralDay295365ASVs   <- subset_samples(OralDay295365ASVs , AgeAtSampl != "170-240")
+OralDay295365ASVs   <- subset_samples(OralDay295365ASVs , AgeAtSampl != "400-468")
+pDay295365ASVs  <- rowSums(otu_table(OralDay295365ASVs)) > 0
+POralDay295365ASVs <- prune_taxa(pDay295365ASVs, OralDay295365ASVs )
+POralDay295365ASVs
+sum(rowSums(otu_table(POralDay295365ASVs)))
+#write.csv(phyloseq::tax_table(POralDay295365ASVs), file = "POralDay295365ASVs.csv")
+```
+
+
+core in oral day295365
+```{r}
+core.taxa.OralDay295365ASVs<- core_members(POralDay295365ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.OralDay295365ASVs <- core(POralDay295365ASVs, detection = 0.001, prevalence = .5)
+pseq.core.OralDay295365ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.OralDay295365ASVs))/sum(taxa_sums(POralDay295365ASVs)) * 100
+sum(taxa_sums(pseq.core.OralDay295365ASVs))
+sum(taxa_sums(POralDay295365ASVs))
+write.csv(phyloseq::tax_table(pseq.core.OralDay295365ASVs), file = "pseq.core.OralDay295365ASVs.csv")
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay295365ASVs, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Actinobacteriota","Bacteroidota","Firmicutes","Gemmatimonadota","Proteobacteria",
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay295365ASVs.csv")
+#View(sample_data(ps))
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay295365ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga","Mycoplasma bovoculi","Rhodococcus erythropolis","Sphingomonas leidyi","Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus","Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae"
+
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay295365ASVsSpecies.csv")
+#View(sample_data(ps))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay295365ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Bdellovibrionota","Chloroflexi","Crenarchaeota","Cyanobacteria","Deinococcota","Desulfobacterota","Elusimicrobiota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Halobacterota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(Subject, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.OralDay295365Phylum.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay295365ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(pseq.core.OralDay295365ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Achromobacter insolitus","Alysiella crassa","Bacteroides caccae","Bacteroides vulgatus","Bifidobacterium adolescentis","Brevundimonas vesicularis","Escherichia-Shigella coli","Mesorhizobium huakuii","Methylobacterium-Methylorubrum extorquens","Moraxella cuniculi","Moraxella oblonga","Mycoplasma bovoculi","Prevotella copri","Prevotella ruminicola","Pseudomonas antarctica","Rhodococcus erythropolis","Romboutsia ilealis","Sphingomonas leidyi","Stenotrophomonas maltophilia","Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus","Unclassified  Alkanindiges","Unclassified  Bacteroides","Unclassified  Bergeyella","Unclassified  Bibersteinia","Unclassified  Catenibacterium","Unclassified  Christensenellaceae R-7 group","Unclassified  Conchiformibius","Unclassified  Mannheimia","Unclassified  Methanobrevibacter","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Prevotella","Unclassified  Prevotellaceae UCG-004","Unclassified  Rikenellaceae RC9 gut group","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified  Succinivibrio","Unclassified  UCG-005", "Unclassified Bacteroidales","Unclassified Pasteurellaceae","Unclassified Saccharofermentans","Unclassified Taonella" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Species) %>%
+  summarize(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay295365Species.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay295365ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Firmicutes","Bacteroidota","Proteobacteria","Spirochaetota","Desulfobacterota","Planctomycetota","Bdellovibrionota",                                           "Chloroflexi","Cyanobacteria","Elusimicrobiota","Fibrobacterota","Fusobacteriota","Gemmatimonadota","Myxococcota","Patescibacteria",    "Synergistota","Verrucomicrobiota","Euryarchaeota","Thermoplasmatota","Acidobacteriota","Actinobacteriota","Halobacterota"))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus)
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_POralDay295365ASVs.csv")
+#View(sample_data(POralDay50120ASVs))
+
+```
+
+
+
+
+POralDay400468ASVs
+```{r}
+OralDay400468ASVs  <- subset_samples(psFinalpsOral, AgeAtSampl != "50-120")
+OralDay400468ASVs   <- subset_samples(OralDay400468ASVs , AgeAtSampl != "170-240")
+OralDay400468ASVs   <- subset_samples(OralDay400468ASVs , AgeAtSampl != "295-365")
+pDay400468ASVs  <- rowSums(otu_table(OralDay400468ASVs)) > 0
+POralDay400468ASVs <- prune_taxa(pDay400468ASVs, OralDay400468ASVs )
+POralDay400468ASVs
+sum(rowSums(otu_table(POralDay400468ASVs)))
+#write.csv(phyloseq::tax_table(POralDay400468ASVs), file = "POralDay400468ASVs.csv")
+```
+
+
+core in oral day400468
+```{r}
+core.taxa.OralDay400468ASVs<- core_members(POralDay400468ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.OralDay400468ASVs <- core(POralDay400468ASVs, detection = 0.001, prevalence = .5)
+pseq.core.OralDay400468ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.OralDay400468ASVs))/sum(taxa_sums(POralDay400468ASVs)) * 100
+sum(taxa_sums(pseq.core.OralDay400468ASVs))
+sum(taxa_sums(POralDay400468ASVs))
+write.csv(phyloseq::tax_table(pseq.core.OralDay400468ASVs), file = "pseq.core.OralDay400468ASVs.csv")
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay400468ASVs, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Actinobacteriota","Bacteroidota","Firmicutes","Gemmatimonadota","Proteobacteria",
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay400468ASVs.csv")
+#View(sample_data(ps))
+```
+
+
+#phylum level relative abundance of core 
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_phylum , function(x) x / sum(x))
+ps_phylum <- tax_glom(pseq.core.OralDay400468ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_phylumP <- subset_taxa(ps_phylum , Phylum %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga","Mycoplasma bovoculi","Rhodococcus erythropolis","Sphingomonas leidyi","Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus","Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae"
+
+
+))
+
+# Calculate the total taxonomic abundance
+phylum.df <- psmelt(relabun )
+
+MySummary <- phylum.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.OralDay400468ASVsSpecies.csv")
+#View(sample_data(ps))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POralDay400468ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Campilobacterota","Chloroflexi","Crenarchaeota","Cyanobacteria",
+"Desulfobacterota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+
+))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genusP)
+
+MySummary <- genus.df %>%
+  group_by(AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.OralDay400468Phylum.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+*Combine Oral Differential*
+
+```{r}
+jpeg("DifferentAbundanceOralInAGES.png", height = 15, width = 20, units = 'in', res = 760)
+psFinalpsOral<- subset_samples(psFinalpsOral, CowID != "2082")
+psFinalpsOral50120170240<- subset_samples(psFinalpsOral, AgeAtSampl != "295-365")
+psFinalpsOral50120170240<- subset_samples(psFinalpsOral50120170240, AgeAtSampl != "400-468")
+sample_data(psFinalpsOral50120170240)$AgeAtSampl <- as.factor(sample_data(psFinalpsOral50120170240)$AgeAtSampl) # factorize for DESeq2
+ps.taxa <- tax_glom(psFinalpsOral50120170240, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between gut and tongue
+ps.taxa.sub <- subset_samples(ps.taxa, AgeAtSampl %in% c("50-120", "170-240"))
+# filter sparse features, with > 90% zeros
+ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.pse.sub, ~ AgeAtSampl)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds, alpha=alpha)
+res = res[order(res$padj, na.last=NA), ]
+summary(res)
+taxa_sig = rownames(res[1:90, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(psFinalpsOral, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.pse.sub)), ps.taxa.rel.sig)
+write.csv(res, file = "Differential_ASVs_ORALSAMPLES_Oral.ASVs.csv")
+write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="Differential_ASVs_ORALSAMPLES_Oral.Taxa.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    AgeAtSampl = as.factor(metadata_sub$AgeAtSampl), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$AgeAtSampl <- factor(annotation_col$AgeAtSampl, levels = c("50-120", "170-240","295-365", "400-468"))
+#annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    AgeAtSampl = c(`50-120` = "#F2CE46", `170-240` = "cyan1", `295-365`="royalblue4",`400-468`= "darksalmon"),
+    `Sex` = c(Heifers = "red", Steers = "blue" ),
+    Phylum = phylum_col
+)
+
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$AgeAtSampl
+                         )
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+write.csv(otu_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_OTU.csv")
+write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file = "DIFFERENTIALABUNDANCE_ORALINAGES_TAXA.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+ps_Rumen<- subset_samples(ps_filtered_count, Subject != "Oral")
+paotRumen <- rowSums(otu_table(ps_Rumen)) > 0
+ps_Rumen<- prune_taxa(paotRumen, ps_Rumen)
+ps_Rumen
+sum(colSums(otu_table(ps_Rumen))) 
+write.csv(phyloseq::tax_table(ps_Rumen), file = "RUMEN_Taxonomy882024.csv")
+```
+
+
+
+
+```{r}
+OTU <- otu_table(ps_Rumen)
+Meta <- sample_data(ps_Rumen)
+TAX <- phyloseq::tax_table(ps_Rumen)
+tax.clean <- as.data.frame(TAX)
+tax.clean[is.na(tax.clean)] <- ""
+tax.clean[tax.clean=="__"] <- ""
+
+for (i in 1:nrow(tax.clean)){
+  if (tax.clean[i,7] != ""){
+    tax.clean$Species[i] <- paste(tax.clean$Genus[i], tax.clean$Species[i], sep = " ")
+  } else if (tax.clean[i,2] == ""){
+    kingdom <- paste("Unclassified", tax.clean[i,1], sep = " ")
+    tax.clean[i, 2:7] <- kingdom
+  } else if (tax.clean[i,3] == ""){
+    phylum <- paste("Unclassified", tax.clean[i,2], sep = " ")
+    tax.clean[i, 3:7] <- phylum
+  } else if (tax.clean[i,4] == ""){
+    class <- paste("Unclassified", tax.clean[i,3], sep = " ")
+    tax.clean[i, 4:7] <- class
+  } else if (tax.clean[i,5] == ""){
+    order <- paste("Unclassified", tax.clean[i,4], sep = " ")
+    tax.clean[i, 5:7] <- order
+  } else if (tax.clean[i,6] == ""){
+    family <- paste("Unclassified", tax.clean[i,5], sep = " ")
+    tax.clean[i, 6:7] <- family
+  } else if (tax.clean[i,7] == ""){
+    tax.clean$Species[i] <- paste("Unclassified ",tax.clean$Genus[i], sep = " ")
+  }
+}
+
+
+OTUS = otu_table(as.matrix(OTU), taxa_are_rows = TRUE)
+TAXA = phyloseq::tax_table(as.matrix(tax.clean))
+SAMPLE <- sample_data(data.frame(Meta))
+# Reorder the samples for the plot
+SAMPLE$AgeAtSampl <- factor(SAMPLE$AgeAtSampl, levels = c("50-120", "170-240", "295-365","400-468"))
+ps_partial = phyloseq(OTUS, TAXA)
+##write.csv(as.data.frame(SAMPLE), file = "SAMP.csv")
+#sample <-read.table("Metadata.txt", header=T, row.names=1,
+ #                             check.names=F, sep="\t")
+sampledata = sample_data(data.frame(
+SAMPLE, row.names=sample_names(ps_partial), stringsAsFactors=FALSE))
+
+TREE = phy_tree(ps_Rumen)
+# merge the data
+psFinalpsRumen <- phyloseq(OTUS, TAXA, sampledata,TREE)
+psFinalpsRumen
+save(psFinalpsRumen, file = "psFinalpsRumen.RData")
+#write.table(otu_table(ps_Oral), "All_otu_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.table(phyloseq::tax_table(psFinalpsOral), "All_taxa_table_psOral.txt", sep = "\t", row.names = TRUE, col.names = NA, quote = FALSE) # having this main OTU table as a .txt file might be useful to verify downstream results
+
+#write.csv(data.frame(SAMPLE), file = "All_sample_data_psOral.csv", row.names = TRUE)
+```
+
+
+```{r}
+#jpeg("ORAL.Phylum.Bar.jpg", height = 12, width = 16, units = 'in', res = 600)
+# Aggregate data at the Phylum level
+physeq_phylum <- tax_glom(psFinalpsOral, taxrank = "Phylum")
+
+# Melt the data for ggplot2
+physeq_phylum_melt <- psmelt(physeq_phylum)
+
+# Plot bar plots
+ggplot(physeq_phylum_melt, aes(x = AgeAtSampl, y = Abundance, fill = Phylum)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_wrap(~Phylum, scales = "free_y") +
+  theme_minimal() +
+  labs(x = "Age", y = "Average Relative Abundance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+```{r}
+# Aggregate data at Phylum level
+ps_phylum <- tax_glom(psFinalpsOral, "Phylum")
+
+# Calculate relative abundance
+ps_phylum_relabund <- transform_sample_counts(ps_phylum, function(x) x / sum(x))
+
+# Melt the data for ggplot2
+df_phylum <- psmelt(ps_phylum_relabund)
+
+# Calculate average relative abundance per sample type
+df_phylum_avg <- df_phylum %>%
+  group_by(Phylum, AgeAtSampl) %>%
+  summarize(AverageRelAbund = mean(Abundance)) %>%
+  ungroup()
+
+# Create the bar plot
+ggplot(df_phylum_avg, aes(x = AgeAtSampl, y = AverageRelAbund, fill = Phylum)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  facet_wrap(~ Phylum, scales = "free_y") +
+  theme_minimal() +
+  labs(y = "Average Relative Abundance", x = "Age")
+
+```
+
+```{r}
+library(phyloseq)
+library(ggplot2)
+library(dplyr)
+library(multcomp)
+library(tidyr)
+
+
+
+# Aggregate data at Phylum level
+ps_phylum <- tax_glom(psFinalpsRumen, "Phylum")
+
+# Calculate relative abundance
+#ps_phylum_relabund <- transform_sample_counts(ps_phylum, function(x) x / sum(x))
+
+# Melt the data for ggplot2
+df_phylum <- psmelt(ps_phylum)
+
+# Calculate mean and standard error
+df_phylum_avg <- df_phylum %>%
+  group_by(Phylum, AgeAtSampl) %>%
+  summarise(AverageRelAbund = mean(Abundance),
+            SEM = sd(Abundance) / sqrt(n())) %>%
+  ungroup()
+
+# Perform pairwise comparisons (example using ANOVA and Tukey's HSD)
+pairwise_comparisons <- function(df, phylum) {
+  aov_result <- aov(Abundance ~ AgeAtSampl, data = df[df$Phylum == phylum, ])
+  tukey_result <- TukeyHSD(aov_result)
+  tukey_df <- as.data.frame(tukey_result$AgeAtSampl)
+  tukey_df$Phylum <- phylum
+  return(tukey_df)
+}
+
+significance_list <- lapply(unique(df_phylum$Phylum), function(phylum) {
+  pairwise_comparisons(df_phylum, phylum)
+})
+
+significance_df <- bind_rows(significance_list)
+
+# Add significance information to the summary dataframe
+df_phylum_avg <- df_phylum_avg %>%
+  left_join(significance_df %>%
+              rownames_to_column(var = "Comparison") %>%
+              separate(Comparison, into = c("50-120", "170-240", "295-365", "400-468")) %>%
+              filter(`p adj` < 0.05))
+
+# Create the bar plot with error bars and significance indications
+ggplot(df_phylum_avg, aes(x = AgeAtSampl, y = AverageRelAbund, fill = Phylum)) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  geom_errorbar(aes(ymin = AverageRelAbund - SEM, ymax = AverageRelAbund + SEM), 
+                position = position_dodge(.9), width = 0.25) +
+  geom_text(aes(label = ifelse(!is.na(AgeAtSampl), "*", "")), 
+            vjust = -0.5, color = "red", size = 5, position = position_dodge(.9)) +
+  facet_wrap(~ Phylum, scales = "free_y") +
+  theme_minimal() +
+  labs(y = "Average Relative Abundance", x = "Age")
+#write.csv(df_phylum_avg, file = "df_phylum_avg.csv")
+
+```
+
+
+
+```{r}
+jpeg("RUMEN_scatterplot.jpg", height = 6, width = 7, units = 'in', res = 650)
+# Summarize data for dot plot
+# Aggregate data at Phylum level
+ps_phylum <- tax_glom(psFinalpsRumen, "Phylum")
+
+# Calculate relative abundance
+ps_phylum_relabund <- transform_sample_counts(ps_phylum, function(x) x / sum(x))
+
+# Melt the data for ggplot2
+df_phylum <- psmelt(ps_phylum_relabund)
+df_dot <- df_phylum %>%
+  group_by(Phylum, AgeAtSampl) %>%
+  summarise(RelAbund = mean(Abundance)) %>%
+  ungroup()
+
+# Create the dot plot
+ppprumen <- ggplot(df_dot, aes(x = AgeAtSampl, y = Phylum, size = RelAbund, color = Phylum)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  scale_size_continuous(range = c(0.5, 10)) +
+  labs(x = "AgeAtSampl", y = "Phylum", size = "Relative Abundance")
+ppprumen
+
+```
+
+```{r}
+jpeg("RUMEN_ALPHAT.jpg", height = 3, width = 5, units = 'in', res = 650)
+
+ps_AlphaRumen<- subset_samples(ps_CountAbunance_alpha, Subject != "Oral")
+paotAlphaRumen <- rowSums(otu_table(ps_AlphaRumen)) > 0
+ps_AlphaRumen<- prune_taxa(paotAlphaRumen, ps_AlphaRumen)
+ps_AlphaRumen
+
+alphaobj <- get_alphaindex(ps_AlphaRumen)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="AgeAtSampl", factorLevels= list(AgeAtSampl=c("50-120","170-240","295-365","400-468")), compare = TRUE,testmethod = "wilcox.test", indexNames =  c("Observe","Shannon")) +
+           scale_fill_manual(values=c("#F2CE46", "cyan1", "royalblue4", "darksalmon"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+jpeg("RUMEN.NMDS.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(psFinalpsRumen, method="jaccard", binary = TRUE)
+ordination = ordinate(psFinalpsRumen, method="NMDS", distance=dist)
+plot_ordination(psFinalpsRumen, ordination, color= "AgeAtSampl", shape = "Diet") + 
+  theme_classic() + 
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(psFinalpsRumen))
+anosim(dist, metadata$AgeAtSampl)
+```
+
+
+```{r}
+jpeg("RUMEN.wunifrac.jpg", height = 4, width = 4, units = 'in', res = 650)
+ps_relabund <- transform_sample_counts(psFinalpsRumen, function(x) x / sum(x))
+dist = phyloseq::distance(ps_relabund, method = "wunifrac")
+ordination = ordinate(ps_relabund, method="PCoA", distance=dist)
+plot_ordination(ps_relabund, ordination, color="AgeAtSampl", shape = "Diet") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_relabund), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_relabund, method="wunifrac") ~  AgeAtSampl+Diet,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+
+```{r}
+jpeg("scatterplotRumen.jpg", height = 6, width = 7, units = 'in', res = 650)
+ps_phylumRumen <- tax_glom(psFinalpsRumen, "Phylum")
+
+# Melt the data for ggplot2
+df_phylumRumen <- psmelt(ps_phylumRumen)
+
+
+# Summarize data for dot plot
+df_dotRumen <-  df_phylumRumen %>%
+  group_by(Phylum, AgeAtSampl) %>%
+  summarise(RelAbund = mean(Abundance)) %>%
+  ungroup()
+
+# Create the dot plot
+ggplot(df_dotRumen, aes(x = AgeAtSampl, y = Phylum, size = RelAbund, color = Phylum)) +
+  geom_point(alpha = 0.6) +
+  theme_minimal() +
+  scale_size_continuous(range = c(0.5, 10)) +
+  labs(x = "Age", y = "Phylum", size = "Relative Abundance")
+```
+
+
+
+```{r}
+jpeg("RUMEN_ALPHAT.jpg", height = 3, width = 5, units = 'in', res = 650)
+
+ps_RUMEN<- subset_samples(ps_filtered_count, Subject != "Oral")
+paotRUMEN <- rowSums(otu_table(ps_RUMEN)) > 0
+ps_RUMEN<- prune_taxa(paotRUMEN, ps_RUMEN)
+sample_data(ps_RUMEN)$AgeAtSampl  <- factor(sample_data(ps_RUMEN)$AgeAtSampl, levels = c("50-120", "170-240", "295-365","400-468"))
+ps_RUMEN
+alphaobj <- get_alphaindex(ps_RUMEN)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="AgeAtSampl", factorLevels= list(AgeAtSampl=c("50-120","170-240","295-365","400-468")), compare = TRUE,testmethod = "wilcox.test", indexNames =  c("Observe","Shannon")) +
+           scale_fill_manual(values=c("#F2CE46", "cyan1", "royalblue4", "darksalmon"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+#jpeg("RUMEN.NMDS.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_RUMEN, method="jaccard", binary = TRUE)
+ordination = ordinate(ps_RUMEN, method="NMDS", distance=dist)
+plot_ordination(ps_RUMEN, ordination, color= "AgeAtSampl", shape = "Diet") + 
+  theme_classic() + 
+  theme(strip.background = element_blank())
+```
+
+```{r}
+metadata <- data.frame(sample_data(ps_Rumen))
+anosim(dist, metadata$AgeAtSampl)
+```
+
+```{r}
+jpeg("RUMEN.bray.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_RUMEN, method="bray")
+ordination = ordinate(ps_RUMEN, method="PCoA", distance=dist)
+plot_ordination(ps_RUMEN, ordination, color="AgeAtSampl", shape = "Diet") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_170240), "data.frame")
+perm_bray <- adonis2(phyloseq::distance(ps_170240, method="bray") ~  Subject,
+       data = metadata)
+datatable(perm_bray)
+```
+
+
+```{r}
+jpeg("RUMEN.wunifrac.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_RUMEN, method = "wunifrac")
+ordination = ordinate(ps_RUMEN, method="PCoA", distance=dist)
+plot_ordination(ps_RUMEN, ordination, color="AgeAtSampl", shape = "Diet") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_RUMEN), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_RUMEN, method="wunifrac") ~  AgeAtSampl,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+
+
+```{r}
+jpeg("RUMEN.Phylum.Bar.jpg", height = 12, width = 16, units = 'in', res = 600)
+# Aggregate data at the Phylum level
+physeq_phylum <- tax_glom(ps_RUMEN, taxrank = "Phylum")
+
+# Melt the data for ggplot2
+physeq_phylum_melt <- psmelt(physeq_phylum)
+
+# Plot bar plots
+ggplot(physeq_phylum_melt, aes(x = AgeAtSampl, y = Abundance, fill = Phylum)) +
+  geom_bar(stat = "identity", position = "stack") +
+  facet_wrap(~Phylum, scales = "free_y") +
+  theme_minimal() +
+  labs(x = "Age", y = "Average Relative Abundance") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+
+
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(psFinalpsRumen , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(ps_genus, Phylum %in% c("Acidobacteriota","Actinobacteriota","Bacteroidota","Campilobacterota","Chloroflexi","Crenarchaeota","Cyanobacteria",
+"Desulfobacterota","Euryarchaeota","Fibrobacterota","Firmicutes","Fusobacteriota","Gemmatimonadota","Myxococcota","Patescibacteria","Planctomycetota","Proteobacteria","Spirochaetota","Sumerlaeota","Synergistota","Thermoplasmatota","Verrucomicrobiota"
+
+))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus)
+
+MySummary <- genus.df %>%
+  group_by(Subject, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_RUMEN_SubjectPhylum.csv")
+#View(sample_data(POralDay50120ASVs))
+#View(phyloseq::tax_table(relabun))
+```
+
+
+PRumen50-120ASVs
+
+```{r}
+RumenDay50120ASVs  <- subset_samples(psFinalpsRumen, AgeAtSampl != "170-240")
+RumenDay50120ASVs    <- subset_samples(RumenDay50120ASVs  , AgeAtSampl != "295-365")
+RumenDay50120ASVs    <- subset_samples(RumenDay50120ASVs  , AgeAtSampl != "400-468")
+pRumenDay50120ASVs   <- rowSums(otu_table(RumenDay50120ASVs )) > 0
+PRumenDay50120ASVs  <- prune_taxa(pRumenDay50120ASVs, RumenDay50120ASVs)
+PRumenDay50120ASVs 
+sum(rowSums(otu_table(PRumenDay50120ASVs )))
+#write.csv(phyloseq::tax_table(PRumenDay50120ASVs ), file = "PRumenDay50120ASVs .csv")
+```
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(PRumenDay50120ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_RumenDay50120SPhylum.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+core in oral day50120
+
+```{r}
+core.taxa.RumenDay50120ASVs<- core_members(PRumenDay50120ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.RumenDay50120ASVs <- core(PRumenDay50120ASVs, detection = 0.001, prevalence = .5)
+pseq.core.RumenDay50120ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.RumenDay50120ASVs))/sum(taxa_sums(PRumenDay50120ASVs)) * 100
+sum(taxa_sums(pseq.core.RumenDay50120ASVs))
+sum(taxa_sums(PRumenDay50120ASVs))
+write.csv(phyloseq::tax_table(pseq.core.RumenDay50120ASVs), file = "pseq.core.RumenDay50120ASVs.csv")
+```
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_genus, function(x) x / sum(x))
+ps_genus <- tax_glom(pseq.core.RumenDay50120ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(relabun )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.RumenDay50120ASVsSpecies.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+
+
+Rumen170-240ASVs
+
+```{r}
+RumenDay170240ASVs  <- subset_samples(psFinalpsRumen, AgeAtSampl != "50-120")
+RumenDay170240ASVs     <- subset_samples(RumenDay170240ASVs   , AgeAtSampl != "295-365")
+RumenDay170240ASVs     <- subset_samples(RumenDay170240ASVs   , AgeAtSampl != "400-468")
+pRumenDay170240ASVs    <- rowSums(otu_table(RumenDay170240ASVs  )) > 0
+PRumenDay170240ASVs  <- prune_taxa(pRumenDay170240ASVs, RumenDay170240ASVs)
+PRumenDay170240ASVs  
+sum(rowSums(otu_table(PRumenDay170240ASVs)))
+#write.csv(phyloseq::tax_table(PRumenDay50120ASVs ), file = "PRumenDay50120ASVs .csv")
+```
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(PRumenDay170240ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_RumenDay170240ASVsPhylum.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+core in oral day170240
+
+```{r}
+core.taxa.RumenDay170240ASVs<- core_members(PRumenDay170240ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.PRumenDay170240ASVs <- core(PRumenDay170240ASVs, detection = 0.001, prevalence = .5)
+pseq.core.PRumenDay170240ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.PRumenDay170240ASVs))/sum(taxa_sums(PRumenDay170240ASVs)) * 100
+sum(taxa_sums(pseq.core.PRumenDay170240ASVs))
+sum(taxa_sums(PRumenDay170240ASVs))
+write.csv(phyloseq::tax_table(pseq.core.PRumenDay170240ASVs), file = "pseq.core.RumenDay170240ASVs.csv")
+```
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(ps_genus , function(x) x / sum(x))
+ps_genus <- tax_glom(pseq.core.PRumenDay170240ASVs, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(relabun)
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.PRumenDay170240ASVsSpecies.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+Rumen295-365ASVs
+
+```{r}
+RumenDay295365ASVs  <- subset_samples(psFinalpsRumen, AgeAtSampl != "50-120")
+RumenDay295365ASVs     <- subset_samples(RumenDay295365ASVs, AgeAtSampl != "170-240")
+RumenDay295365ASVs     <- subset_samples(RumenDay295365ASVs, AgeAtSampl != "400-468")
+pRumenDay295365ASVs    <- rowSums(otu_table(RumenDay295365ASVs  )) > 0
+PRumenDay295365ASVs  <- prune_taxa(pRumenDay295365ASVs, RumenDay295365ASVs)
+PRumenDay295365ASVs  
+sum(rowSums(otu_table(PRumenDay295365ASVs)))
+#write.csv(phyloseq::tax_table(PRumenDay50120ASVs ), file = "PRumenDay50120ASVs .csv")
+```
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(PRumenDay170240ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_RumenDay170240ASVsPhylum.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+core in oral day295365
+
+```{r}
+core.taxa.RumenDay295365ASVs<- core_members(PRumenDay295365ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.PRumenDay295365ASVs <- core(PRumenDay295365ASVs, detection = 0.001, prevalence = .5)
+pseq.core.PRumenDay295365ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.PRumenDay295365ASVs))/sum(taxa_sums(PRumenDay295365ASVs)) * 100
+sum(taxa_sums(pseq.core.PRumenDay295365ASVs))
+sum(taxa_sums(PRumenDay295365ASVs))
+write.csv(phyloseq::tax_table(pseq.core.PRumenDay295365ASVs), file = "pseq.core.PRumenDay295365ASVs.csv")
+```
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(pseq.core.PRumenDay295365ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.PRumenDay295365ASVsSpecies.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+
+Rumen400-468ASVs
+
+```{r}
+RumenDay400468ASVs  <- subset_samples(psFinalpsRumen, AgeAtSampl != "50-120")
+RumenDay400468ASVs    <- subset_samples(RumenDay400468ASVs, AgeAtSampl != "170-240")
+RumenDay400468ASVs     <- subset_samples(RumenDay400468ASVs, AgeAtSampl != "295-365")
+pRumenDay400468ASVs    <- rowSums(otu_table(RumenDay400468ASVs)) > 0
+PRumenDay400468ASVs  <- prune_taxa(pRumenDay400468ASVs, RumenDay400468ASVs)
+PRumenDay400468ASVs  
+sum(rowSums(otu_table(PRumenDay400468ASVs)))
+#write.csv(phyloseq::tax_table(PRumenDay50120ASVs ), file = "PRumenDay50120ASVs .csv")
+```
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(PRumenDay400468ASVs , function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Phylum", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Phylum) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_RumenDay170240ASVsPhylum.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+core in oral day400468
+
+```{r}
+core.taxa.RumenDay400468ASVs<- core_members(PRumenDay400468ASVs, detection = 0.001, prevalence = 50/100)
+
+pseq.core.PRumenDay400468ASVs <- core(PRumenDay400468ASVs, detection = 0.001, prevalence = .5)
+pseq.core.PRumenDay400468ASVs
+
+```
+
+
+```{r}
+sum(taxa_sums(pseq.core.PRumenDay400468ASVs))/sum(taxa_sums(PRumenDay400468ASVs)) * 100
+sum(taxa_sums(pseq.core.PRumenDay400468ASVs))
+sum(taxa_sums(PRumenDay400468ASVs))
+write.csv(phyloseq::tax_table(pseq.core.PRumenDay400468ASVs), file = "MeanAbundance_pseq..core.PRumenDay400468ASVs.csv")
+```
+
+
+#phylum level relative abundance
+```{r}
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(pseq.core.PRumenDay400468ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Species", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Species) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_pseq.core.PRumenDay400468ASVsSpecies.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
+
+
+
+```{r}
+otu_tab_file<- "All_otu_table_psOral_edited.txt"
+tax_file <- "All_taxa_table_psOral_edited.txt"
+
+
+replicates_list <-c("S_195","S_197","S_198","S_199","S_201","S_202","S_204","S_207","S_211","S_213","S_214","S_215","S_217","S_218","S_219","S_221","S_222","S_225","S_226","S_227","S_228","S_229","S_230","S_231","S_236","S_238","S_239","S_240","S_241","S_242","S_243","S_246","S_247","S_248","S_249","S_250","S_251","S_252","S_253","S_254","S_257","S_258","S_259","S_260","S_261","S_262","S_263","S_264","S_265","S_267","S_269","S_270","S_271","S_272","S_273","S_274","S_275","S_276","S_277","S_278","S_279","S_281","S_284","S_285","S_288","S_289","S_290","S_291","S_292","S_293","S_294","S_295","S_296","S_297","S_298","S_299","S_300","S_301","S_302","S_303","S_304","S_305","S_306","S_307","S_308","S_309","S_310","S_311","S_312","S_313","S_314","S_315","S_319","S_320","S_321","S_322","S_323","S_324","S_325","S_326","S_327","S_328","S_329","S_330","S_331","S_332","S_333","S_335","S_336","S_337","S_338","S_339","S_340","S_341","S_342","S_343","S_344","S_345","S_346","S_347","S_350","S_351","S_352","S_354","S_355","S_357","S_358","S_359","S_360","S_361","S_362","S_363","S_364","S_365","S_366","S_367","S_368","S_370","S_372","S_373","S_374","S_375","S_376","S_378","S_380","S_381","S_384","R1","R10","R106","R11","R113","R114","R115","R119","R12","R120","R121","R122","R123","R125","R126","R128","R13","R130","R132","R133","R134","R135","R137","R138","R14","R140","R143","R144","R146","R15","R150","R151","R152","R154","R158","R159","R16","R160","R162","R164","R166","R171","R172","R173","R174","R176","R178","R179","R180","R182","R183","R186","R187","R188","R19","R20","R21","R22","R23","R24","R25","R26","R27","R28","R29","R3","R30","R31","R32","R33","R34","R35","R36","R37","R38","R4","R40","R41","R42","R43","R44","R45","R46","R47","R48","R5","R50","R51","R52","R53","R55","R57","R58","R59","R6","R60","R62","R64","R66","R68","R69","R7","R70","R71","R72","R73","R74","R75","R76","R79","R80","R81","R82","R83","R84","R85","R86","R87","R88","R9","R90","R91","R92","A290","A291","A292","A293","A294","A297","A299","A302","A303","A304","A305","A306","A307","A308","A309","A310","A311","A314","A315","A316","A317","A318","A319","A320","A321","A322","A323","A324","A326","A327","A328","A329","A330","A331","A332","A334","A336","A338","A339","A340","A341","A342","A343","A344","A345","A346","A347","A348","A349","A350","A352","A353","A354","A355","A356","A357","A358","A360","A361","A362","A363","A365","B37","B38","B39","B40","B41","B42","B43","B44","B45","B46","B47","B48","B49","B50","B51","B52","B53","B54","B55","B56","B57","B58","B59","B60","B61","B62"
+)
+
+
+
+replicates_groups <- c("50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","50-120","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","170-240","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","295-365","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468","400-468"
+)
+
+
+# Do these two list have the same length?
+length(replicates_list) == length(replicates_groups)
+```
+
+
+```{r}
+# Taxonomic level that will be aggregated and displaeyed in the bubble plot.
+# It should match a taxonomic level from the taxonomic annotation file.
+# If you want to display OTUs/ASVs, simply write 'OTU'.
+tax_aggr <- "Family"
+
+# Number of taxonomic bins to be displayed in the bubble plot.
+tax_number <- 100
+
+# Taxonomic level that will be used for colouring bubbles (i.e. categorical variable)
+# It should match a taxonomic level from the taxonomic annotation file
+# (and it should be a higher taxonomic level that the one from 'tax_aggr').
+tax_col <- "Phylum"
+
+# Filename for saving the bubble plot (svg or pdf)
+file_name <- "bubble_plot.svg"
+
+# Dimension (in inch) of this file (first number is the width, the second number is the height)
+plot_dim <- c(7,7)
+```
+
+
+
+```{r}
+otu_tab <- read.table(otu_tab_file, header = TRUE, comment.char = "", sep = "\t")
+names(otu_tab)[1] <- "OTU"
+
+otu_tab[1:5,1:5]
+```
+
+
+```{r}
+tax_tab <- read.table(tax_file, header = TRUE, comment.char = "", sep = "\t", fill = TRUE)
+names(tax_tab)[1] <- "OTU"
+
+tax_tab[1:5,1:4]
+```
+
+
+
+Parse taxonomic file
+
+```{r}
+library("reshape2")
+library("stringr")
+
+
+# Delete all cells containing 'uncultured' or 'unkown'
+for (col in 2:ncol(tax_tab)) {
+    for (row in 1:nrow(tax_tab)) {
+        if (grepl("uncultured",tax_tab[row,col],ignore.case = TRUE)) {
+            tax_tab[row,col] <- ""
+        }
+        if (grepl("unknown",tax_tab[row,col],ignore.case = TRUE)) {
+            tax_tab[row,col] <- ""
+        }
+    }
+}
+
+# Replace empty cells by 'NA'
+tax_tab2 <- as.data.frame(apply(tax_tab, 2, function(x) gsub("^$|^ $", NA, x)))
+
+# Remove columns containing only 'NA'
+col_to_remove <- c()
+
+for (col in 2:ncol(tax_tab2)) {
+    x <- sum(is.na(tax_tab2[,col]))/nrow(tax_tab2)
+    if (x == 1) {
+        col_to_remove <- c(col_to_remove, col)
+    }
+}
+
+if (length(col_to_remove) > 0) {
+    tax_tab3 <- tax_tab2[,-col_to_remove]
+} else {
+    tax_tab3 <- tax_tab2
+}
+
+# Set taxonomic annotations as character variables
+
+for (col in 2:ncol(tax_tab3)) {
+    tax_tab3[,col] <- as.character(tax_tab3[,col])
+}
+
+# Fill all NAs
+
+for (col in 2:ncol(tax_tab3)) {
+    for (row in 1:nrow(tax_tab3)) {
+        if (is.na(tax_tab3[row,col])) {
+            if (!grepl("OTU", tax_tab3[row,col-1]) & !grepl("unassigned", tax_tab3[row,col-1])) {
+                tax_tab3[row,col] <- paste0("unassigned ", tax_tab3[row,col-1])
+            } else {
+                tax_tab3[row,col] <- tax_tab3[row,col-1]
+            }
+        }
+    }
+}
+```
+
+
+Compute relative abundance OTU 
+
+```{r}
+otu_counts <- colSums(otu_tab[,-1])
+otu_tab2 <- otu_tab
+otu_tab2[,-1] <- sweep(otu_tab[,-1], 2, otu_counts, `/`)
+otu_tab2[is.na(otu_tab2)] <- 0
+
+# Check that the sum of relative abundances for each sample is 1.
+colSums(otu_tab2[,-1])
+```
+
+Merge OTU and taxonomic
+```{r}
+m <- merge(otu_tab2, tax_tab3)
+
+# Has the merged table the expected dimension?
+dim(m)
+```
+
+```{r}
+# First, we should save in a column the taxonomic information needed for computing the bubble plot
+taxonomy <- c()
+for (row in 1:nrow(m)) {
+    taxonomy <- c(taxonomy, paste0(m[row,names(m)==tax_col], ";", m[row,names(m)==tax_aggr]))
+}
+
+# Subset from the merged table the selected samples only
+m2 <- m[,names(m) %in% replicates_list]
+
+# Aggregate 'm2' based on the selected taxonomic level
+m3 <- aggregate(m2, by=list(taxonomy), FUN=sum)
+
+dim(m3)
+m3[1:5,1:4]
+```
+
+```{r}
+# Sort the taxonomic table
+
+if (tax_number > nrow(m3)) {
+        tax_number <- nrow(m3)
+    }
+    
+m3$average <- rowMeans(m3[,-1])
+m3.sorted <- m3[order(-m3$average),]
+
+# Aggregate the smaller taxonomic bins together
+m3.sorted$selection <- rep("discarded", nrow(m3.sorted))
+m3.sorted$selection[1:tax_number] <- "retained"
+m3.sorted$Group.1[m3.sorted$selection == "discarded"] <- "Other;Other"
+m3.sorted$average <- NULL
+m3.sorted$selection <- NULL
+m4 <- aggregate(m3.sorted[,-1], by=list(taxonomy=m3.sorted$Group.1), FUN=sum)
+
+# What is the relative abundances of the taxonomic bins that were pooled together in the 'Other' bin?
+m4[m4$taxonomy == "Other;Other", -1]
+mean(as.numeric(m4[m4$taxonomy == "Other;Other", -1]))
+```
+
+```{r}
+n <- m4$taxonomy
+m4.t <- as.data.frame(t(m4[,-1]))
+colnames(m4.t) <- n
+m4.t$sample <- rownames(m4.t)
+rownames(m4.t) <- NULL
+```
+
+
+```{r}
+m4.t$replicate <- rep(NA, nrow(m4.t))
+for (line in 1:(nrow(m4.t))){
+m4.t$replicate[line] <- replicates_groups[m4.t$sample[line] == replicates_list]
+}
+
+# Compute the mean
+m4.t.mean <- aggregate(m4.t[,1:(ncol(m4.t)-2)],
+                              by = list(m4.t$replicate),
+                              FUN = "mean")
+names(m4.t.mean)[1] <- "sample"
+
+dim(m4.t.mean) 
+
+# Compute the standard deviation                             
+m4.t.sd <- aggregate(m4.t[,1:(ncol(m4.t)-2)],
+                              by = list(m4.t$replicate),
+                              FUN = "sd")
+names(m4.t.sd)[1] <- "sample"
+                                  
+dim(m4.t.sd) 
+```
+
+```{r}
+ #Melt the dataframes
+molten.mean <- melt(m4.t.mean, id.vars = "sample")
+molten.mean$id <- paste0(molten.mean$sample, "-", molten.mean$variable)
+
+molten.sd <- melt(m4.t.sd, id.vars = "sample")
+molten.sd$id <- paste0(molten.sd$sample, "-", molten.sd$variable)
+
+# Merge the dataframes
+molten <- merge(molten.mean, molten.sd, by.x = "id", by.y = "id")
+
+molten$id <- NULL
+molten$sample.y <- NULL
+molten$variable.y <- NULL
+names(molten) <- c("sample", "taxonomy", "mean", "sd")
+
+molten$tax_col <- str_split_fixed(molten$taxonomy, ";", 2)[,1]
+molten$tax_bin <- str_split_fixed(molten$taxonomy, ";", 2)[,2]
+
+# Reorder the taxonomic annotation for the plot
+molten <- molten[order(molten$tax_col),]
+tax_levels <- as.character(molten$tax_bin[!duplicated(molten$tax_bin)])
+tax_levels <- tax_levels[tax_levels != "Other"]
+tax_levels <- c(tax_levels, "Other")
+molten$tax_bin <- factor(molten$tax_bin, levels = rev(tax_levels))
+
+# Reorder the samples for the plot
+molten$sample <- factor(molten$sample, levels = c("50-120", "170-240", "295-365","400-468"))
+# Remove null values
+molten2 <- molten[molten$mean > 0,]
+```
+
+
+```{r}
+jpeg("Bubble_plot_otu.jpg", height = 20, width = 10, units = 'in', res = 600)
+
+bubble_plot <- ggplot(molten2,aes(sample,tax_bin)) +
+    geom_point(aes(size=mean+sd), shape=30, color = "red") + 
+    geom_point(aes(size=mean, fill=tax_col),shape=21,color="black") +
+    theme(panel.grid.major=element_line(linetype=1,color="grey"),
+          axis.text.x=element_text(angle=90,hjust=1,vjust=0),
+          panel.background = element_blank()) +
+    ylab("Taxa") +
+    xlab("Samples") +
+    scale_fill_brewer(palette="Paired", name="Phylum") +
+    scale_fill_discrete(name="Phylum") +
+    scale_fill_manual(values= c(brewer.pal(11, "Paired"), brewer.pal(9, "Set1"), brewer.pal(8,'Dark2')), name="Phylum") +
+    scale_size(name = "Relative\nabundance")
+
+bubble_plot
+```
+
+
+
+```{r}
+OTU <- otu_table(ps_filtered_count)
+Meta <- sample_data(ps_filtered_count)
+TAX <- phyloseq::tax_table(ps_filtered_count)
+tax.clean <- as.data.frame(TAX)
+tax.clean[is.na(tax.clean)] <- ""
+tax.clean[tax.clean=="__"] <- ""
+
+for (i in 1:nrow(tax.clean)){
+  if (tax.clean[i,7] != ""){
+    tax.clean$Species[i] <- paste(tax.clean$Genus[i], tax.clean$Species[i], sep = " ")
+  } else if (tax.clean[i,2] == ""){
+    kingdom <- paste("Unclassified", tax.clean[i,1], sep = " ")
+    tax.clean[i, 2:7] <- kingdom
+  } else if (tax.clean[i,3] == ""){
+    phylum <- paste("Unclassified", tax.clean[i,2], sep = " ")
+    tax.clean[i, 3:7] <- phylum
+  } else if (tax.clean[i,4] == ""){
+    class <- paste("Unclassified", tax.clean[i,3], sep = " ")
+    tax.clean[i, 4:7] <- class
+  } else if (tax.clean[i,5] == ""){
+    order <- paste("Unclassified", tax.clean[i,4], sep = " ")
+    tax.clean[i, 5:7] <- order
+  } else if (tax.clean[i,6] == ""){
+    family <- paste("Unclassified", tax.clean[i,5], sep = " ")
+    tax.clean[i, 6:7] <- family
+  } else if (tax.clean[i,7] == ""){
+    tax.clean$Species[i] <- paste("Unclassified ",tax.clean$Genus[i], sep = " ")
+  }
+}
+
+
+OTUS = otu_table(as.matrix(OTU), taxa_are_rows = TRUE)
+TAXA = phyloseq::tax_table(as.matrix(tax.clean))
+SAMPLE <- sample_data(data.frame(Meta))
+# Reorder the samples for the plot
+SAMPLE$AgeAtSampl <- factor(SAMPLE$AgeAtSampl, levels = c("50-120", "170-240", "295-365","400-468"))
+ps_partial = phyloseq(OTUS, TAXA)
+
+sampledata = sample_data(data.frame(
+SAMPLE, row.names=sample_names(ps_partial), stringsAsFactors=FALSE))
+
+TREE = phy_tree(ps_filtered_count)
+# merge the data
+psFinalpscount <- phyloseq(OTUS, TAXA, sampledata,TREE)
+psFinalpscount
+
+
+ps_50120 <- subset_samples(psFinalpscount, AgeAtSampl != "170-240")
+ps_50120 <- subset_samples(ps_50120, AgeAtSampl != "295-365")
+ps_50120 <- subset_samples(ps_50120, AgeAtSampl != "400-468")
+
+paotps_50120 <- rowSums(otu_table(ps_50120)) > 0
+ps_50120<- prune_taxa(paotps_50120, ps_50120)
+ps_50120
+view(otu_table(ps_50120))
+sample_data(ps_50120)$Subject <- factor(sample_data(ps_50120)$Subject, levels = c("Rumen", "Oral"))
+write.csv(otu_table(ps_50120), file = "OTU50120.csv")
+write.csv(phyloseq::tax_table(ps_50120), file = "50120.csv")
+write.csv(data.frame(sample_data(ps_50120)), file = "META50120.csv")
+
+
+ps_50120Oral <- subset_samples(ps_50120, Subject != "Rumen")
+
+write.csv(otu_table(ps_50120Oral), file = "ASVs50120ORALcount.csv")
+write.csv(phyloseq::tax_table(ps_50120Oral), file = "TAXA50120ORALcount.csv")
+write.csv(data.frame(sample_data(ps_50120Oral)), file = "Sample50120ORALcount.csv")
+
+ps_50120Rumen <- subset_samples(ps_50120, Subject != "Oral")
+
+write.csv(otu_table(ps_50120Rumen), file = "ASVs50120RUMENcount.csv")
+write.csv(phyloseq::tax_table(ps_50120Rumen), file = "TAXA50120RUMENcount.csv")
+write.csv(data.frame(sample_data(ps_50120Rumen)), file = "Sample50120RUMENcount.csv")
+```
+
+
+```{r}
+jpeg("50120.jpg", height = 4, width = 4, units = 'in', res = 650)
+
+alphaobj <- get_alphaindex(ps_50120)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="Subject", factorLevels= list(AgeAtSampl=c("Oral","Rumen")), compare = TRUE,testmethod = "wilcox.test", indexNames =  "Shannon") +
+           scale_fill_manual(values=c("#F2CE46","#5A3E87"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+jpeg("50120.bray1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_50120, method="bray")
+ordination = ordinate(ps_50120, method="PCoA", distance=dist)
+plot_ordination(ps_50120, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_50120), "data.frame")
+perm_bray <- adonis2(phyloseq::distance(ps_50120, method="bray") ~  Subject,
+       data = metadata)
+datatable(perm_bray)
+```
+
+
+
+```{r}
+jpeg("50120.wunifrac1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_50120, method = "wunifrac")
+ordination = ordinate(ps_50120, method="PCoA", distance=dist)
+plot_ordination(ps_50120, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_50120), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_50120, method="wunifrac") ~  Subject,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+```{r}
+jpeg("50120.NMDS1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_50120, method="jaccard", binary = TRUE)
+ordination = ordinate(ps_50120, method="NMDS", distance=dist)
+
+plot_ordination(ps_50120, ordination, color="Subject") + 
+  theme_classic() +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(ps_50120))
+anosim(dist, metadata$Subject)
+```
+
+
+```{r}
+cbn <- combn(x=unique(metadata$Subject), m = 2)
+p <- c()
+
+for(i in 1:ncol(cbn)){
+ps.subs <- subset_samples(ps_50120, Subject %in% cbn[,i])
+metadata_sub <- data.frame(sample_data(ps.subs))
+permanova_pairwise <- anosim(phyloseq::distance(ps.subs, method="jaccard", binary = TRUE), 
+                             metadata_sub$Subject)
+p <- c(p, permanova_pairwise$signif[1])
+}
+
+p.adj <- p.adjust(p, method = "BH")
+p.table <- cbind.data.frame(t(cbn), p=p, p.adj=p.adj)
+p.table
+```
+
+
+
+
+```{r}
+library(BGLR)
+library(ISLR)
+library(CMplot)
+library(performance)
+library(vegan)
+library(psych)
+library(corrplot)
+
+
+sample_data(ps_50120)$Subject <- as.factor(sample_data(ps_50120)$Subject) # factorize for DESeq2
+ps.taxa <- tax_glom(ps_50120, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between gut and tongue
+ps.taxa.sub <- subset_samples(ps.taxa, Subject %in% c("Oral", "Rumen"))
+# filter sparse features, with > 90% zeros
+ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.pse.sub, ~ Subject)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds, alpha=alpha)
+res = res[order(res$padj, na.last=NA), ]
+write.csv(res, file ="RESULTS_50120.csv")
+
+taxa_sig = rownames(res) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(ps_50120, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.pse.sub)), ps.taxa.rel.sig)
+ps.taxa.rel.sig
+write.csv(otu_table(ps.taxa.rel.sig), file = "RESULT_05120_OTU.csv")
+write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file = "RESULT_05120_TAXA.csv")
+
+library(corrplot)
+
+
+mat_abs <- read.csv("OTU50120_man.csv", header = T, row.names = 1)
+mat_abs <- as.matrix(mat_abs)
+corrplot(mat_abs, method="shade", shade.col=NA, tl.col="black", tl.cex=0.9, cl.ratio = 0.6,tl.srt=100)
+M = cor(mtcars)
+corrplot(M, method = 'shade')
+
+
+
+# Load necessary libraries
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Load the data
+data <- read.csv("OTU50120_Man.csv")
+
+
+SNPs <- list(
+	data$SNPs[data$Oral<1e-6],
+	data$SNPs[data$Rumen<1e-6]
+)
+ CMplot(data, plot.type="m",multracks=TRUE,threshold=c(1e-6,1e-4),threshold.lty=c(1,2), 
+        threshold.lwd=c(1,1), threshold.col=c("black","grey"), amplify=TRUE, signal.col=
+        c("red","green"), signal.cex=1, file="jpg",file.name="",dpi=300,file.output=TRUE,
+        verbose=TRUE, highlight=SNPs, highlight.text=SNPs, highlight.text.cex=1.4)
+#Note: if you are not supposed to change the color of signal, 
+#      please set signal.col=NULL and highlight.col=NULL.
+ 
+ set.seed(100)
+fst <- read.csv("OralMicrobiome50120Effects.csv")
+head(fst)
+
+
+  	SNPs <- list(
+	data$SNPs[data$Oral<1e-3],
+	data$SNPs[data$Rumen<1e-3]
+)
+
+CMplot(data, plot.type="m",multracks=TRUE,threshold=c(1e-3,1e-2),threshold.lty=c(1,2), 
+        threshold.lwd=c(1,1), threshold.col=c("black","grey"), amplify=TRUE, signal.col=
+        c("red","green"), signal.cex=1, file="jpg",file.name="",dpi=300,file.output=TRUE,
+        verbose=TRUE, highlight=SNPs, highlight.text=SNPs, highlight.text.cex=1.4)
+
+
+library(qqman)
+
+library(qqman)
+
+# Load the data
+data <- read.csv("OTU50120_Man.csv")
+
+# Check the structure of the data
+str(data)
+
+# Prepare the data for the Manhattan plot
+# Assuming that the Oral column contains p-values for the SNPs
+# If this assumption is incorrect, adjust accordingly
+
+# Ensure CHR is treated as a factor and then convert to numeric
+data$CHR <-factor(data$CHR)
+
+# Check for non-finite p-values and remove them
+data <- data[is.finite(data$Oral) & data$Oral > 0 & data$Oral <= 1, ]
+
+# Create a new dataframe for the Manhattan plot
+manhattan_data <- data.frame(
+  SNP = data$SNPs,
+  CHR = data$CHR,  # Chromosome
+  BP = 1:nrow(data),  # Assuming sequential base-pair positions
+  P = data$Oral  # Assuming Oral contains p-values
+)
+
+# Check the prepared data
+str(manhattan_data)
+
+# Create the Manhattan plot
+manhattan(manhattan_data, chr = "CHR", bp = "BP", snp = "SNP", p = "P",
+          main = "Manhattan Plot", col = c("blue4", "orange3"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+170-240
+
+
+```{r}
+ps_170240 <- subset_samples(psFinalpscount, AgeAtSampl != "50-120")
+ps_170240 <- subset_samples(ps_170240, AgeAtSampl != "295-365")
+ps_170240 <- subset_samples(ps_170240, AgeAtSampl != "400-468")
+paotps_170240 <- rowSums(otu_table(ps_170240)) > 0
+ps_170240<- prune_taxa(paotps_170240, ps_170240)
+ps_170240
+# Reorder the samples for the plot
+sample_data(ps_170240)$Subject <- factor(sample_data(ps_170240)$Subject, levels = c("Oral","Rumen"))
+write.csv(otu_table(ps_170240), file = "OTU170240.csv")
+write.csv(phyloseq::tax_table(ps_170240), file = "170240.csv")
+write.csv(data.frame(sample_data(ps_170240)), file = "META170240.csv")
+
+```
+
+
+```{r}
+#jpeg("170240.jpg", height = 4, width = 4, units = 'in', res = 650)
+
+alphaobj <- get_alphaindex(ps_170240)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="Subject", factorLevels= list(AgeAtSampl=c("Oral","Rumen")), compare = TRUE,testmethod = "wilcox.test", indexNames =  "Shannon") +
+           scale_fill_manual(values=c("#F2CE46","#5A3E87"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+jpeg("170240.bray1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_170240, method="bray")
+ordination = ordinate(ps_170240, method="PCoA", distance=dist)
+plot_ordination(ps_170240, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_170240), "data.frame")
+perm_bray <- adonis2(phyloseq::distance(ps_170240, method="bray") ~  Subject,
+       data = metadata)
+datatable(perm_bray)
+```
+
+
+```{r}
+jpeg("170240.wunifrac1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_170240, method = "wunifrac")
+ordination = ordinate(ps_170240, method="PCoA", distance=dist)
+plot_ordination(ps_170240, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_170240), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_170240, method="wunifrac") ~  Subject,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+
+```{r}
+jpeg("170240.NMDS1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_170240, method="jaccard", binary = TRUE)
+ordination = ordinate(ps_170240, method="NMDS", distance=dist)
+
+plot_ordination(ps_170240, ordination, color="Subject") + 
+  theme_classic() +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(ps_170240))
+anosim(dist, metadata$Subject)
+```
+
+
+
+295-365
+
+```{r}
+ps_295365 <- subset_samples(psFinalpscount, AgeAtSampl != "50-120")
+ps_295365 <- subset_samples(ps_295365, AgeAtSampl != "170-240")
+ps_295365 <- subset_samples(ps_295365, Sex != "Steers")
+ps_295365 <- subset_samples(ps_295365, AgeAtSampl != "400-468")
+paotps_295365 <- rowSums(otu_table(ps_295365)) > 0
+ps_295365<- prune_taxa(paotps_295365, ps_295365)
+ps_295365
+sample_data(ps_295365)$Subject <- factor(sample_data(ps_295365)$Subject, levels = c("Rumen", "Oral"))
+write.csv(otu_table(ps_295365), file = "OTU295365.csv")
+write.csv(phyloseq::tax_table(ps_295365), file = "295365.csv")
+write.csv(data.frame(sample_data(ps_295365)), file = "META295365.csv")
+```
+
+
+```{r}
+jpeg("295395.jpg", height = 4, width = 4, units = 'in', res = 650)
+
+alphaobj <- get_alphaindex(ps_295365)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="Subject", factorLevels= list(AgeAtSampl=c("Oral","Rumen")), compare = TRUE,testmethod = "wilcox.test", indexNames =  "Shannon") +
+           scale_fill_manual(values=c("#F2CE46","#5A3E87"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+
+```{r}
+jpeg("295365.bray1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_295365, method="bray")
+ordination = ordinate(ps_295365, method="PCoA", distance=dist)
+plot_ordination(ps_295365, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_295365), "data.frame")
+perm_bray <- adonis2(phyloseq::distance(ps_295365, method="bray") ~  Subject,
+       data = metadata)
+datatable(perm_bray)
+```
+
+
+```{r}
+jpeg("295365.wunifrac1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_295365, method = "wunifrac")
+ordination = ordinate(ps_295365, method="PCoA", distance=dist)
+plot_ordination(ps_295365, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_295365), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_295365, method="wunifrac") ~  Subject,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+```{r}
+jpeg("295365.NMDS1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_295365, method="jaccard", binary = TRUE)
+ordination = ordinate(ps_295365, method="NMDS", distance=dist)
+
+plot_ordination(ps_295365, ordination, color="Subject") + 
+  theme_classic() +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(ps_295365))
+anosim(dist, metadata$Subject)
+```
+
+
+400-468
+
+```{r}
+ps_400468 <- subset_samples(psFinalpscount, AgeAtSampl != "50-120")
+ps_400468 <- subset_samples(ps_400468, AgeAtSampl != "170-240")
+ps_400468 <- subset_samples(ps_400468, AgeAtSampl != "295-365")
+paotps_400468 <- rowSums(otu_table(ps_400468)) > 0
+ps_400468<- prune_taxa(paotps_400468, ps_400468)
+ps_400468
+
+sample_data(ps_400468)$Subject <- factor(sample_data(ps_400468)$Subject, levels = c("Rumen", "Oral"))
+write.csv(otu_table(ps_400468), file = "OTU400468.csv")
+write.csv(phyloseq::tax_table(ps_400468), file = "400468.csv")
+write.csv(data.frame(sample_data(ps_400468)), file = "META400468.csv")
+```
+
+
+```{r}
+jpeg("400468.jpg", height = 4, width = 4, units = 'in', res = 650)
+
+alphaobj <- get_alphaindex(ps_400468)
+p_alpha <- ggbox(alphaobj, geom="violin", factorNames="Subject", factorLevels= list(AgeAtSampl=c("Oral","Rumen")), compare = TRUE,testmethod = "wilcox.test", indexNames =  "Shannon") +
+           scale_fill_manual(values=c("#F2CE46","#5A3E87"))+ #,"#5A3E87"
+           theme(strip.background = element_rect(colour=NA, fill="grey"))
+p_alpha
+```
+
+
+```{r}
+jpeg("400468.bray1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_400468, method="bray")
+ordination = ordinate(ps_400468, method="PCoA", distance=dist)
+plot_ordination(ps_400468, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_400468), "data.frame")
+perm_bray <- adonis2(phyloseq::distance(ps_400468, method="bray") ~  Subject,
+       data = metadata)
+datatable(perm_bray)
+```
+
+
+
+
+```{r}
+jpeg("400468.wunifrac1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_400468, method = "wunifrac")
+ordination = ordinate(ps_400468, method="PCoA", distance=dist)
+plot_ordination(ps_400468, ordination, color="Subject") + 
+  theme_classic()  +
+  theme(strip.background = element_blank())
+```
+
+
+
+```{r}
+library(vegan)
+library(DT)
+metadata <- as(phyloseq::sample_data(ps_400468), "data.frame")
+perm_weighted <- adonis2(phyloseq::distance(ps_400468, method="wunifrac") ~  Subject,
+       data = metadata)
+datatable(perm_weighted)
+```
+
+
+
+```{r}
+jpeg("400468.NMDS1.jpg", height = 4, width = 4, units = 'in', res = 650)
+dist = phyloseq::distance(ps_400468, method="jaccard", binary = TRUE)
+ordination = ordinate(ps_400468, method="NMDS", distance=dist)
+
+plot_ordination(ps_400468, ordination, color="Subject") + 
+  theme_classic() +
+  theme(strip.background = element_blank())
+```
+
+
+```{r}
+metadata <- data.frame(sample_data(ps_400468))
+anosim(dist, metadata$Subject)
+```
+
+
+```{r}
+library("plyr"); packageVersion("plyr")
+library("tidyverse"); packageVersion("tidyverse")
+library("phyloseq"); packageVersion("phyloseq")
+library("vegan"); packageVersion("vegan")
+library("gridExtra"); packageVersion("gridExtra")
+library("knitr"); packageVersion("knitr")
+library("DESeq2"); packageVersion("DESeq2")
+library("plotly"); packageVersion("plotly")
+library("microbiome"); packageVersion("microbiome")
+library("ggpubr"); packageVersion("ggpubr")
+library("data.table"); packageVersion("data.table")
+```
+
+
+
+
+```{r}
+readsumsdf <- data.frame(nreads = sort(taxa_sums(psFinalpscount), decreasing = TRUE), 
+                        sorted = 1:ntaxa(psFinalpscount),
+                        type = "ASV")
+```
+
+
+```{r}
+sample_sum_df <- data.frame(sum = sample_sums(psFinalpscount))
+
+# Make plots
+# Generates a bar plot with # of reads (y-axis) for each taxa. Sorted from most to least abundant
+# Generates a second bar plot with # of reads (y-axis) per sample. Sorted from most to least
+p.reads = ggplot(readsumsdf, aes(x = sorted, y = nreads)) +
+  geom_bar(stat = "identity") +
+  ggtitle("ASV Assessment") +
+  scale_y_log10() +
+  facet_wrap(~type, scales = "free") +
+  ylab("# of Sequences")
+p.reads 
+```
+
+
+```{r}
+# Histogram of the number of Samples (y-axis) at various read depths
+p.reads.hist <- ggplot(sample_sum_df, aes(x = sum)) + 
+  geom_histogram(color = "black", fill = "firebrick3", binwidth = 150) +
+  ggtitle("Distribution of sample sequencing depth") + 
+  xlab("Read counts") +
+  ylab("# of Samples")
+
+# Final plot, side-by-side
+grid.arrange(p.reads, p.reads.hist, ncol = 2)
+
+# Basic summary statistics
+summary(sample_sums(psFinalpscount))
+```
+
+```{r}
+# Format a data table to combine sample summary data with sample variable data
+ss <- sample_sums(psFinalpscount)
+sd <- as.data.frame(sample_data(psFinalpscount))
+ss.df <- merge(sd, data.frame("ASV" = ss), by ="row.names")
+
+# Plot the data by the treatment variable
+y = 1000 # Set a threshold for the minimum number of acceptable reads. Can start as a guess
+x = "Subject" # Set the x-axis variable you want to examine
+label = "sample" # This is the label you want to overlay on the points
+
+p.ss.boxplot <- ggplot(ss.df, aes_string(x, y = "ASV", color = "AgeAtSampl")) + 
+  geom_boxplot(outlier.colour="NA", position = position_dodge(width = 0.8)) +
+  geom_jitter(size = 2, alpha = 0.6) +
+  scale_y_log10() +
+  facet_wrap(~AgeAtSampl) +
+  geom_hline(yintercept = y, lty = 2) 
+p.ss.boxplot
+```
+
+prevalence assessment 
+```{r}
+# Prevalence estimation
+# Calculate feature prevalence across the data set
+prevdf <- apply(X = otu_table(psFinalpscount),MARGIN = ifelse(taxa_are_rows(psFinalpscount), yes = 1, no = 2),FUN = function(x){sum(x > 0)})
+
+# Add taxonomy and total read counts to prevdf
+prevdf <- data.frame(Prevalence = prevdf, TotalAbundance = taxa_sums(psFinalpscount), phyloseq::tax_table(psFinalpscount))
+
+#Prevalence plot
+prevdf1 <- subset(prevdf, Phylum %in% get_taxa_unique(psFinalpscount, "Phylum"))
+p.prevdf1 <- ggplot(prevdf1, aes(TotalAbundance, Prevalence / nsamples(psFinalpscount),color=Family)) +
+  geom_hline(yintercept = 0.05, alpha = 0.5, linetype = 2) +
+  geom_point(size = 3, alpha = 0.7) +
+  scale_x_log10() +
+  xlab("Total Abundance") + ylab("Prevalence [Frac. Samples]") +
+  facet_wrap(~Phylum) +
+  theme(legend.position="none") +
+  ggtitle("Phylum Prevalence in All Samples\nColored by Family")
+p.prevdf1
+```
+
+
+
+```{r data-transform}
+# Transform to Relative abundances
+ps2.ra <- transform_sample_counts(psFinalpscount, function(OTU) OTU/sum(OTU))
+
+# Transform to Proportional Abundance
+ps2.prop <- transform_sample_counts(psFinalpscount, function(x) min(sample_sums(psFinalpscount)) * x/sum(x))
+
+# Log transformation moves to a more normal distribution
+ps2.log <- transform_sample_counts(psFinalpscount, function(x) log(1 + x))
+
+# View how each function altered count data
+par(mfrow=c(1,4))
+plot(sort(sample_sums(psFinalpscount), TRUE), type = "o", main = "Native", ylab = "RSVs", xlab = "Samples")
+plot(sort(sample_sums(ps2.log), TRUE), type = "o", main = "log Transformed", ylab = "RSVs", xlab = "Samples")
+plot(sort(sample_sums(ps2.ra), TRUE), type = "o", main = "Relative Abundance", ylab = "RSVs", xlab = "Samples")
+plot(sort(sample_sums(ps2.prop), TRUE), type = "o", main = "Proportional Abundance", ylab = "RSVs", xlab = "Samples")
+par(mfrow=c(1,4))
+
+# Histograms of the non-transformed data vs. the transformed data can address the shift to normality
+p.nolog <- qplot(rowSums(otu_table(psFinalpscount))) + ggtitle("Raw Counts") +
+  theme_bw() +
+  xlab("Row Sum") +
+  ylab("# of Samples")
+
+p.log <- qplot(log10(rowSums(otu_table(psFinalpscount)))) +
+  ggtitle("log10 transformed counts") +
+  theme_bw() +
+  xlab("Row Sum") +
+  ylab("# of Samples")
+
+ggarrange(p.nolog, p.log, ncol = 2, labels = c("A)", "B)"))
+
+```
+
+
+
+```{r community-composition-plots}
+# Create a data table for ggplot
+ps2_phylum <- psFinalpscount %>%
+  tax_glom(taxrank = "Phylum") %>%                     # agglomerate at phylum level
+  transform_sample_counts(function(x) {x/sum(x)} ) %>% # Transform to rel. abundance (or use ps0.ra)
+  psmelt() %>%                                         # Melt to long format for easy ggploting
+  filter(Abundance > 0.01)                             # Filter out low abundance taxa
+
+# Plot - Phylum
+p.ra.phylum <- ggplot(ps2_phylum, aes(x = SampleID, y = Abundance, fill = Phylum)) + 
+  geom_bar(stat = "identity", width = 1) +
+  facet_wrap(AgeAtSampl~Subject, scales = "free_x", nrow = 4, ncol = 7) +
+  theme(axis.text.x = element_blank()) +
+  theme(axis.title.x = element_blank()) +
+  labs(title = "Abundant Phylum (> 1%)")
+p.ra.phylum
+
+# You can rerun the first bit of code in this chunk and change Phylum to Species, Genus, etc.
+
+# Draw in interactive plotly plot
+ggplotly(p.ra.phylum)
+
+```
+
+
+
+```{r phyla-level-plots-preparation}
+# agglomerate taxa to a specific taxanomic level
+glom <- tax_glom(ps2.ra, taxrank = 'Phylum')
+
+# create dataframe from phyloseq object
+dat <- as.tibble(psmelt(glom))
+
+# Reorder Phylum levels from most -> least abundant
+levels(dat$Phylum)
+dat$Phylum <- factor(dat$Phylum, levels = c("Bacteroidetes", "Firmicutes", "Proteobacteria", "Fibrobacterota", "Actinobacteria", "Verrucomicrobia"))
+levels(dat$Phylum)
+
+# Select 4 most abundant Phyla for a reduced plot
+dat.1 <- filter(dat, Phylum %in% c("Bacteroidetes", "Firmicutes", "Proteobacteria", "Fibrobacterota", "Actinobacteria", "Verrucomicrobia"))
+levels(dat.1$Phylum)
+dat.1 <- droplevels(dat)
+levels(dat$Phylum)
+
+```
+
+
+```{r phyla-level-plotting}
+# Phyla plots with loess smoother 
+p.smoothed.phylum <- ggplot(dat, aes(x = Subject, y = Abundance, color = Phylum, group = Phylum)) +
+  stat_smooth(method = "loess") +
+  facet_grid(~AgeAtSampl) +
+  ylab("Relative Abundance") +
+  geom_point(size = 1.25, alpha = 0.4)
+p.smoothed.phylum
+
+```
+
+
+
+```{r alpha-diverstiy-plots}
+alpha.div <- estimate_richness(psFinalpscount, measures = c("Observed", "Shannon"))
+sd.1 <- as.data.frame(sample_data(psFinalpscount)) # Can not use original sd as samples have been removed
+ps2.rich <- cbind(sd.1, alpha.div) # Bind alpha diversity columns to sample data
+
+# Richness
+p.rich <- ggplot(ps2.rich, aes(x = AgeAtSampl, y = Observed, color = Subject, group = Subject)) +
+  stat_smooth(method = "loess") +
+  labs(y = "Richness", color = "Sample Type", x = "") +
+  geom_jitter(size = 2, alpha = 0.5, width = 0.2) +
+  scale_color_manual(values = c("black", "chocolate", "green", "purple"))
+
+# Shannon diversity
+p.sd <- ggplot(ps2.rich, aes(x = AgeAtSampl, y = Observed, color = Subject, group = Subject)) +
+  stat_smooth(method = "loess") +
+  labs(y = "Richness", color = "Sample Type", x = "") +
+  geom_jitter(size = 2, alpha = 0.5, width = 0.2) +
+  scale_color_manual(values = c("black", "chocolate", "green", "purple"))
+
+# Note: ggarrange enalbes you to directly add labels to plot grids
+ggarrange(p.rich, p.sd, ncol = 2, labels = c("A)", "B)"))
+
+```
+
+
+```{r ordination}
+#Ordination Analysis
+ord.pcoa.uni <- ordinate(psFinalpscount, method = "PCoA", distance = "unifrac")
+ord.pcoa.wuni <- ordinate(psFinalpscount, method = "PCoA", distance = "wunifrac")
+
+```
+And now to plot each ordination.
+
+```{r ordination-plots}
+## Ordination plots all samples
+# Unifrac
+p.pcoa.uni <- plot_ordination(psFinalpscount, ord.pcoa.uni, color = "Subject", axes = c(1,2)) +
+  geom_point(size = 2) +
+  labs(title = "PCoA of UniFrac Distances", color = "Sample Type") +
+  facet_grid(~AgeAtSampl)
+p.pcoa.uni
+
+# Weighted Unifrac
+p.pcoa.wuni <- plot_ordination(psFinalpscount, ord.pcoa.wuni, color = "Subject", axes = c(1,2)) +
+  geom_point(size = 2) +
+  labs(title = "PCoA of wUniFrac Distances", color = "Sample Type") +
+  facet_grid(~AgeAtSampl)
+p.pcoa.wuni
+
+ggarrange(p.pcoa.uni, p.pcoa.wuni, nrow = 2, labels = c("A)", "B)"))
+
+```
+
+
+```{r}
+# Test for taxa which at one or more time points after time 0 showed a treatment-specific effect
+# Convert phyloseq object to DESeq2 table
+ds.vehicle_metro.LRT <- phyloseq_to_deseq2(psFinalpscount, ~Subject + AgeAtSampl + Subject:AgeAtSampl)
+
+# Run DESeq2
+dds.vehicle_metro.LRT <- DESeq(ds.vehicle_metro.LRT, test="Wald")
+
+# Tabulate results
+res.dds.vehicle_metro.LRT <- results(dds.vehicle_metro.LRT)
+res.dds.vehicle_metro.LRT$symbol <- mcols(dds.vehicle_metro.LRT)$symbol
+summary(res.dds.vehicle_metro.LRT)
+mcols(res.dds.vehicle_metro.LRT)
+write.table(res.dds.vehicle_metro.LRT, file = "../results/deseq_vehicle_v_metro_LRT.txt", sep = "\t")
+
+nrow(res.dds.vehicle_metro.LRT)
+df.res <- as.data.frame(res.dds.vehicle_metro.LRT[ which(res.dds.vehicle_metro.LRT$padj < 0.05), ])
+nrow(df.res)
+df.res <- rownames_to_column(df.res, var = "ASV")
+write.table(df.res, file = "../results/df_deseq2_results.txt", sep = "\t")
+
+# C
+```
+
+
+
+##Differential Abundance @ 50 - 120
+
+
+```{r}
+jpeg("DifferentAbundance.p50120.OralvsRumen.png", height = 13, width = 20, units = 'in', res = 760)
+
+sample_data(ps_50120)$Subject <- as.factor(sample_data(ps_50120)$Subject) # factorize for DESeq2
+ps.taxa <- tax_glom(ps_50120, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between oral and rumen
+ps.taxa.sub <- subset_samples(ps.taxa, Subject %in% c("Oral", "Rumen"))
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ Subject)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentialAbundance_ASVs_p50120_OralvsRumen.csv")
+taxa_sig = rownames(sigtab[1:60, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(ps_50120, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p50120OralvsRumen_ASV.csv" )
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p50120OralvsRumen_taxa.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="DifferentialAbundance_ASVs__p50120OralvsRumen_metadata.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    Subject = as.factor(metadata_sub$Subject), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$Subject <- factor(annotation_col$Subject, levels = c("Oral", "Rumen"))
+annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    Subject = c(`Oral` = "red", `Rumen` = "blue"),
+    `Sex` = c(Heifers = "purple", Steers = "yellow"),
+    Phylum = phylum_col
+)
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$Subject)
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+```
+
+
+##Differential Abundance @ 170 - 240
+
+
+```{r}
+jpeg("DifferentAbundance.p170240.OralvsRumen.png", height = 13, width = 20, units = 'in', res = 760)
+
+sample_data(ps_170240)$Subject <- as.factor(sample_data(ps_170240)$Subject) # factorize for DESeq2
+ps.taxa <- tax_glom(ps_170240, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between oral and rumen
+ps.taxa.sub <- subset_samples(ps.taxa, Subject %in% c("Oral", "Rumen"))
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ Subject)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentialAbundance_ASVs_p170240_OralvsRumen.csv")
+taxa_sig = rownames(sigtab[1:70, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(ps_170240, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p170240OralvsRumen_ASV.csv" )
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p170240OralvsRumen_taxa.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="DifferentialAbundance_ASVs__p170240OralvsRumen_metadata.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    Subject = as.factor(metadata_sub$Subject), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$Subject <- factor(annotation_col$Subject, levels = c("Oral", "Rumen"))
+annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    Subject = c(`Oral` = "red", `Rumen` = "blue"),
+    `Sex` = c(Heifers = "purple", Steers = "yellow"),
+    Phylum = phylum_col
+)
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$Subject)
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+```
+
+
+
+
+```{r}
+jpeg("DifferentAbundance.p295365.OralvsRumen.png", height = 13, width = 20, units = 'in', res = 760)
+
+sample_data(ps_295365)$Subject <- as.factor(sample_data(ps_295365)$Subject) # factorize for DESeq2
+ps.taxa <- tax_glom(ps_295365, taxrank = 'Species', NArm = FALSE)
+
+#view(sample_data(ps_295365))
+# pairwise comparison between oral and rumen
+ps.taxa.sub <- subset_samples(ps.taxa, Subject %in% c("Oral", "Rumen"))
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ Subject)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentialAbundance_ASVs_p295365_OralvsRumen.csv")
+taxa_sig = rownames(sigtab[1:70, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(ps_295365, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p295365OralvsRumen_ASV.csv" )
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p295365OralvsRumen_taxa.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="DifferentialAbundance_ASVs__p295365OralvsRumen_metadata.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    Subject = as.factor(metadata_sub$Subject), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$Subject <- factor(annotation_col$Subject, levels = c("Oral", "Rumen"))
+annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    Subject = c(`Oral` = "red", `Rumen` = "blue"),
+    `Sex` = c(Heifers = "purple", Steers = "yellow"),
+    Phylum = phylum_col
+)
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$Subject)
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+```
+
+
+
+
+
+```{r}
+jpeg("DifferentAbundance.p400468.OralvsRumen.png", height = 13, width = 20, units = 'in', res = 760)
+
+sample_data(ps_400468)$Subject <- as.factor(sample_data(ps_400468)$Subject) # factorize for DESeq2
+ps.taxa <- tax_glom(ps_400468, taxrank = 'Species', NArm = FALSE)
+
+
+# pairwise comparison between oral and rumen
+ps.taxa.sub <- subset_samples(ps.taxa, Subject %in% c("Oral", "Rumen"))
+# filter sparse features, with > 90% zeros
+#ps.taxa.pse.sub <- prune_taxa(rowSums(otu_table(ps.taxa.sub) == 0) < ncol(otu_table(ps.taxa.sub)) * 0.9, ps.taxa.sub)
+ps_ds = phyloseq_to_deseq2(ps.taxa.sub, ~ Subject)
+# use alternative estimator on a condition of "every gene contains a sample with a zero"
+ds <- estimateSizeFactors(ps_ds, type="poscounts")
+ds = DESeq(ds, test="Wald", fitType="parametric")
+alpha = 0.05 
+res = results(ds)
+dim(res)
+res = res[order(res$padj, na.last=NA), ]
+df <- as.data.frame(res)
+df$taxon <- rownames(df)
+sigtab = df[(df$padj < alpha), ]
+
+dim(sigtab)
+#write.csv(sigtab, file = "DifferentialAbundance_ASVs_p400468_OralvsRumen.csv")
+taxa_sig = rownames(sigtab[1:90, ]) # select bottom 20 with lowest p.adj values
+ps.taxa.rel <- transform_sample_counts(ps_400468, function(x) x/sum(x)*100)
+ps.taxa.rel.sig <- prune_taxa(taxa_sig, ps.taxa.rel)
+# Only keep gut and tongue samples
+ps.taxa.rel.sig <- prune_samples(colnames(otu_table(ps.taxa.sub)), ps.taxa.rel.sig)
+#write.csv(phyloseq::otu_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p400468OralvsRumen_ASV.csv" )
+#write.csv(phyloseq::tax_table(ps.taxa.rel.sig), file ="DifferentialAbundance_ASVs__p400468OralvsRumen_taxa.csv" )
+#write.csv(data.frame(phyloseq::sample_data(ps.taxa.rel.sig)), file ="DifferentialAbundance_ASVs__p400468OralvsRumen_metadata.csv" )
+library(ComplexHeatmap)
+
+matrix <- as.matrix(data.frame(otu_table(ps.taxa.rel.sig)))
+rownames(matrix) <- as.character(phyloseq::tax_table(ps.taxa.rel.sig)[, "Species"])
+metadata_sub <- data.frame(sample_data(ps.taxa.rel.sig))
+# Define the annotation color for columns and rows
+annotation_col = data.frame(
+    Subject = as.factor(metadata_sub$Subject), 
+    Sex = as.factor(metadata_sub$Sex), 
+    check.names = FALSE
+)
+rownames(annotation_col) = rownames(metadata_sub)
+
+annotation_row = data.frame(
+    Phylum = as.factor(phyloseq::tax_table(ps.taxa.rel.sig)[, "Phylum"])
+)
+rownames(annotation_row) = rownames(matrix)
+
+annotation_col$Subject <- factor(annotation_col$Subject, levels = c("Oral", "Rumen"))
+annotation_col$Sex <- factor(annotation_col$Sex, levels = c("Heifers", "Steers"))
+# ann_color should be named vectors
+phylum_col = RColorBrewer::brewer.pal(length(levels(annotation_row$Phylum)), "Paired")
+names(phylum_col) = levels(annotation_row$Phylum)
+ann_colors = list(
+    Subject = c(`Oral` = "red", `Rumen` = "blue"),
+    `Sex` = c(Heifers = "purple", Steers = "yellow"),
+    Phylum = phylum_col
+)
+
+ComplexHeatmap::pheatmap(matrix, scale = "row", 
+                         annotation_col = annotation_col, 
+                         annotation_row = annotation_row, 
+                         annotation_colors = ann_colors,
+                         row_split = annotation_row$Phylum,
+                         column_split = annotation_col$Subject)
+                         #display_numbers = matrix(ifelse(matrix > 5, "*", ""), nrow(matrix)))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+Oral50120   <- subset_samples(ps_400468, Subject != "Oral")
+pOral50120ASVs   <- rowSums(otu_table(Oral50120 )) > 0
+POral50120ASVs  <- prune_taxa(pOral50120ASVs, Oral50120)
+POral50120ASVs 
+# Calculate the relative abundance for all samples
+relabun <- transform_sample_counts(POral50120ASVs, function(x) x / sum(x))
+ps_genus <- tax_glom(relabun, taxrank = "Family", NArm = FALSE)
+# Calculate the relative abundance for specific genera
+ps_genusP <- subset_taxa(relabun, Species %in% c("Alysiella crassa","Aminobacter aminovorans","Moraxella oblonga", "Mycoplasma bovoculi", "Ralstonia insidiosa","Rhodococcus erythropolis", "Sphingomonas leidyi", "Streptococcus rupicaprae","Unclassified  Acinetobacter","Unclassified  Actinobacillus", "Unclassified  Asinibacterium","Unclassified  Bibersteinia","Unclassified  Moraxella","Unclassified  Phreatobacter","Unclassified  Porphyromonas","Unclassified  Reyranella","Unclassified  Sediminibacterium","Unclassified  Streptococcus","Unclassified Gemmatimonadaceae","Unclassified Pasteurellaceae" ))
+
+# Calculate the total taxonomic abundance
+genus.df <- psmelt(ps_genus )
+
+MySummary <- genus.df %>%
+  group_by(Subject, AgeAtSampl, Family) %>%
+  summarise(mean_abund = mean(Abundance, na.rm=TRUE))
+head(MySummary)
+write.csv(MySummary, file = "MeanAbundance_PRumen400468ASVs_Family.csv")
+#View(sample_data(POralDay50120ASVs))
+View(phyloseq::tax_table(relabun))
+```
+
